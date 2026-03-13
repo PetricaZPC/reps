@@ -1,10 +1,8 @@
 import {
   createUserWithEmailAndPassword,
-  onAuthStateChanged,
   signInWithEmailAndPassword,
-  User,
 } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { auth } from "./firebaseConfig";
 
@@ -12,15 +10,6 @@ export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLogin, setIsLogin] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-
-    return unsubscribe;
-  }, []);
 
   const handleAuth = async () => {
     try {
@@ -35,21 +24,6 @@ export default function SignIn() {
       Alert.alert("Error", error.message);
     }
   };
-
-  if (user) {
-    return (
-      <View className="flex-1 justify-center items-center bg-white p-5">
-        <Text className="text-2xl font-bold mb-4">Welcome,</Text>
-        <Text className="text-base mb-2">{user.email}</Text>
-        <TouchableOpacity
-          onPress={() => auth.signOut()}
-          className="bg-red-500 px-8 py-3 rounded-lg mt-4"
-        >
-          <Text className="text-white font-semibold">Logout</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <View className="flex-1 justify-center items-center bg-white p-5">
