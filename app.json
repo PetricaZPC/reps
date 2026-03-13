@@ -20,11 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-<<<<<<< Updated upstream
       "package": "com.petricazpc.reps"
-=======
-      "package": "com.anonymous.reps"
->>>>>>> Stashed changes
     },
     "web": {
       "output": "static",
@@ -32,6 +28,14 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow reps to access your camera",
+          "microphonePermission": "Allow reps to access your microphone",
+          "recordAudioAndroid": true
+        }
+      ],
       [
         "expo-splash-screen",
         {
