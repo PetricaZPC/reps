@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "718670365739",
+    "project_id": "reps-7a88c",
+    "storage_bucket": "reps-7a88c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:718670365739:android:5e464f9d77fadc6fca566e",
+        "android_client_info": {
+          "package_name": "com.reps"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtnoS5jZ0bmPLjnl73ZP_YrO4V58-aEmI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
