@@ -1,15 +1,11 @@
-import { Text, View } from "react-native";
-
+import { Text, View } from 'react-native';
+import { passData } from '../src/passData';
 export default function Index() {
+  const calories = passData((state) => state.calories);
+
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Text>Edit app/index.tsx to edit this screen.</Text>
+    <View>
+      <Text>Hello, Petrica. You ate: {calories} calories</Text>
     </View>
   );
 }
