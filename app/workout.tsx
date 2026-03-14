@@ -1,12 +1,33 @@
-import { addDoc, collection, getDocs, query } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
-import { Alert, Pressable, SafeAreaView, ScrollView, StatusBar, Text, View, useWindowDimensions } from 'react-native';
-import { auth, db } from '../firebase/firebaseConfig';
-import Camera from '../src/Camera';
-import { EXERCISES, ExerciseConfig, MuscleGroup } from '../src/exercises';
-import { WORKOUT_PRESETS, WorkoutPreset, getPresetExercises } from '../src/workoutPresets';
+import { addDoc, collection, getDocs, query } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { auth, db } from "../firebase/firebaseConfig";
+import Camera from "../src/Camera";
+import { EXERCISES, ExerciseConfig, MuscleGroup } from "../src/exercises";
+import {
+  WORKOUT_PRESETS,
+  WorkoutPreset,
+  getPresetExercises,
+} from "../src/workoutPresets";
 
-type Screen = 'menu' | 'presets' | 'single' | 'custom' | 'customSelect' | 'customList' | 'workout';
+type Screen =
+  | "menu"
+  | "presets"
+  | "single"
+  | "custom"
+  | "customSelect"
+  | "customList"
+  | "workout";
 
 interface CustomWorkout {
   id?: string;
@@ -14,129 +35,70 @@ interface CustomWorkout {
   exercises: string[];
 }
 
-// ==================== MODERN DESIGN SYSTEM ====================
 const COLORS = {
-  primary: '#0ea5a0',
-  primaryLight: '#ccfbf1',
-  primaryDark: '#0d9488',
-  secondary: '#6366f1',
-  secondaryLight: '#e0e7ff',
-  accent: '#8b5cf6',
-  accentLight: '#ede9fe',
-  background: '#f5f7fa',
-  surface: '#ffffff',
-  surfaceAlt: '#f8fafc',
-  text: '#1e293b',
-  textMedium: '#64748b',
-  textLight: '#94a3b8',
-  border: '#e2e8f0',
-  divider: '#f1f5f9',
+  background: "#ffffff",
+  surface: "#ffffff",
+  text: "#111111",
+  textMedium: "#444444",
+  textLight: "#666666",
+  border: "#dddddd",
+  divider: "#e5e5e5",
+  primary: "#111111",
 };
 
-const SHADOWS = {
-  soft: {
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  medium: {
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-};
-
-const R = 24;
-
-// ==================== REUSABLE COMPONENTS ====================
-
-// Large Card for Menu
-function MenuCard({ 
-  title, 
-  description, 
-  info, 
-  color, 
-  bgColor, 
+function MenuCard({
+  title,
+  subtitle,
   onPress,
-  borderColor,
-}: { 
-  title: string; 
-  description: string; 
-  info: string;
-  color: string;
-  bgColor: string;
+}: {
+  title: string;
+  subtitle: string;
   onPress: () => void;
-  borderColor?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        backgroundColor: pressed ? COLORS.surfaceAlt : COLORS.surface,
-        borderRadius: R,
-        padding: 24,
-        marginBottom: 16,
+        backgroundColor: COLORS.surface,
+        borderRadius: 10,
+        padding: 16,
+        marginBottom: 12,
         borderWidth: 1,
-        borderColor: borderColor || COLORS.border,
-        ...SHADOWS.medium,
+        borderColor: COLORS.border,
+        opacity: pressed ? 0.75 : 1,
       })}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        <View style={{ 
-          width: 56, 
-          height: 56, 
-          borderRadius: 16, 
-          backgroundColor: bgColor, 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          marginRight: 18,
-        }}>
-          <Text style={{ fontSize: 28, color: color }}>▶</Text>
-        </View>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
         <View style={{ flex: 1 }}>
-          <Text style={{ 
-            color: COLORS.text, 
-            fontSize: 22, 
-            fontWeight: '700',
-            marginBottom: 6,
-          }}>
+          <Text
+            style={{
+              color: COLORS.text,
+              fontSize: 18,
+              fontWeight: "700",
+              marginBottom: 3,
+            }}
+          >
             {title}
           </Text>
-          <Text style={{ 
-            color: COLORS.textMedium, 
-            fontSize: 15,
-            lineHeight: 22,
-            marginBottom: 10,
-          }}>
-            {description}
-          </Text>
-          <Text style={{ 
-            color: color, 
-            fontSize: 14, 
-            fontWeight: '600',
-          }}>
-            {info}
+          <Text style={{ color: COLORS.textMedium, fontSize: 14 }}>
+            {subtitle}
           </Text>
         </View>
+        <Text style={{ color: COLORS.textLight, fontSize: 16 }}>{">"}</Text>
       </View>
     </Pressable>
   );
 }
 
-// Exercise/Workout List Item
-function ListItem({ 
-  title, 
-  subtitle, 
-  onPress, 
+function ListItem({
+  title,
+  subtitle,
+  onPress,
   index,
   showArrow = true,
-}: { 
-  title: string; 
-  subtitle?: string; 
+}: {
+  title: string;
+  subtitle?: string;
   onPress?: () => void;
   index?: number;
   showArrow?: boolean;
@@ -145,226 +107,301 @@ function ListItem({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        backgroundColor: pressed ? COLORS.surfaceAlt : COLORS.surface,
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
+        backgroundColor: COLORS.surface,
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        marginBottom: 8,
+        flexDirection: "row",
+        alignItems: "center",
         borderWidth: 1,
-        borderColor: pressed ? colorVar('primaryLight') : COLORS.border,
-        ...SHADOWS.soft,
+        borderColor: COLORS.border,
+        opacity: pressed ? 0.75 : 1,
       })}
     >
       {index !== undefined && (
-        <View style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          backgroundColor: COLORS.primaryLight,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 16,
-        }}>
-          <Text style={{ color: COLORS.primary, fontWeight: '700', fontSize: 15 }}>{index}</Text>
-        </View>
-      )}
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: COLORS.text, fontSize: 17, fontWeight: '600', marginBottom: 4 }}>{title}</Text>
-        {subtitle && <Text style={{ color: COLORS.textLight, fontSize: 14 }}>{subtitle}</Text>}
-      </View>
-      {showArrow && <Text style={{ color: COLORS.primary, fontSize: 18, fontWeight: '300' }}>→</Text>}
-    </Pressable>
-  );
-}
-
-// Header with back button
-function Header({ title, onBack }: { title: string; onBack?: () => void }) {
-  return (
-    <View style={{ 
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      paddingHorizontal: 20,
-      paddingVertical: 16, 
-      backgroundColor: COLORS.surface,
-      borderBottomWidth: 1, 
-      borderBottomColor: COLORS.border,
-    }}>
-      {onBack && (
-        <Pressable 
-          onPress={onBack}
-          style={{ 
-            width: 42, 
-            height: 42, 
-            borderRadius: 21, 
-            backgroundColor: COLORS.surfaceAlt, 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginRight: 14,
+        <View
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 4,
+            backgroundColor: "#f3f3f3",
+            alignItems: "center",
+            justifyContent: "center",
+            marginRight: 10,
           }}
         >
-          <Text style={{ fontSize: 20, color: COLORS.primary }}>←</Text>
+          <Text style={{ color: COLORS.text, fontWeight: "700", fontSize: 12 }}>
+            {index}
+          </Text>
+        </View>
+      )}
+
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: COLORS.text, fontSize: 15, fontWeight: "600" }}>
+          {title}
+        </Text>
+        {subtitle && (
+          <Text style={{ color: COLORS.textLight, fontSize: 13, marginTop: 2 }}>
+            {subtitle}
+          </Text>
+        )}
+      </View>
+
+      {showArrow && (
+        <Text style={{ color: COLORS.textLight, fontSize: 15 }}>{">"}</Text>
+      )}
+    </Pressable>
+  );
+}
+
+function Header({ title, onBack }: { title: string; onBack?: () => void }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.divider,
+      }}
+    >
+      {onBack && (
+        <Pressable
+          onPress={onBack}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            alignItems: "center",
+            justifyContent: "center",
+            marginRight: 10,
+          }}
+        >
+          <Text style={{ color: COLORS.text, fontSize: 14 }}>{"<"}</Text>
         </Pressable>
       )}
-      <Text style={{ fontSize: 22, fontWeight: '700', color: COLORS.text }}>{title}</Text>
-    </View>
-  );
-}
-
-// Section Title
-function SectionTitle({ title }: { title: string }) {
-  return (
-    <Text style={{
-      fontSize: 13,
-      fontWeight: '600',
-      color: COLORS.textLight,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-      marginBottom: 16,
-      marginTop: 8,
-    }}>
-      {title}
-    </Text>
-  );
-}
-
-// Info Card (for preset details)
-function InfoCard({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={{
-      backgroundColor: COLORS.surface,
-      borderRadius: R,
-      padding: 22,
-      marginBottom: 24,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      ...SHADOWS.soft,
-    }}>
-      {children}
-    </View>
-  );
-}
-
-// Tag
-function Tag({ text, color, bgColor }: { text: string; color: string; bgColor: string }) {
-  return (
-    <View style={{
-      backgroundColor: bgColor,
-      paddingHorizontal: 14,
-      paddingVertical: 6,
-      borderRadius: 20,
-      marginRight: 8,
-    }}>
-      <Text style={{ color: color, fontSize: 13, fontWeight: '600' }}>{text}</Text>
-    </View>
-  );
-}
-
-// Checkbox Item
-function CheckboxItem({ title, checked, onPress }: { title: string; checked: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        backgroundColor: checked ? COLORS.primary : pressed ? COLORS.surfaceAlt : COLORS.surface,
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: checked ? COLORS.primary : COLORS.border,
-        padding: 16,
-        marginBottom: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-      })}
-    >
-      <View style={{
-        width: 24,
-        height: 24,
-        borderRadius: 6,
-        backgroundColor: checked ? '#fff' : 'transparent',
-        borderWidth: 2,
-        borderColor: checked ? COLORS.primary : COLORS.border,
-        marginRight: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        {checked && <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: '700' }}>✓</Text>}
-      </View>
-      <Text style={{ color: checked ? '#fff' : COLORS.text, fontSize: 16, fontWeight: '500', flex: 1 }}>{title}</Text>
-    </Pressable>
-  );
-}
-
-// Primary Button
-function PrimaryButton({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => ({
-        backgroundColor: pressed ? COLORS.primaryDark : COLORS.primary,
-        paddingVertical: 18,
-        borderRadius: 18,
-        alignItems: 'center',
-        ...SHADOWS.medium,
-        opacity: disabled ? 0.5 : 1,
-      })}
-    >
-      <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>{title}</Text>
-    </Pressable>
-  );
-}
-
-// Empty State
-function EmptyState({ message }: { message: string }) {
-  return (
-    <View style={{
-      backgroundColor: COLORS.surface,
-      borderRadius: R,
-      padding: 40,
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      ...SHADOWS.soft,
-    }}>
-      <Text style={{ fontSize: 48, marginBottom: 16 }}>📋</Text>
-      <Text style={{ color: COLORS.textMedium, fontSize: 16, textAlign: 'center' }}>{message}</Text>
-    </View>
-  );
-}
-
-// Selection Counter
-function SelectionCounter({ count }: { count: number }) {
-  return (
-    <View style={{
-      backgroundColor: COLORS.surface,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      ...SHADOWS.soft,
-    }}>
-      <Text style={{ color: COLORS.primary, fontWeight: '600', fontSize: 16 }}>
-        {count} exercise{count !== 1 ? 's' : ''} selected
+      <Text style={{ color: COLORS.text, fontSize: 21, fontWeight: "700" }}>
+        {title}
       </Text>
     </View>
   );
 }
 
-// Helper function
-function colorVar(c: keyof typeof COLORS): string {
-  return COLORS[c] || COLORS.border;
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <Text
+      style={{
+        color: COLORS.textMedium,
+        fontSize: 13,
+        fontWeight: "600",
+        marginBottom: 8,
+      }}
+    >
+      {title}
+    </Text>
+  );
 }
 
-// ==================== MAIN SCREEN ====================
+function GroupBox({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: COLORS.surface,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        padding: 12,
+        marginBottom: 12,
+      }}
+    >
+      <SectionTitle title={title} />
+      {children}
+    </View>
+  );
+}
+
+function InfoCard({ children }: { children: React.ReactNode }) {
+  return (
+    <View
+      style={{
+        backgroundColor: COLORS.surface,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        padding: 12,
+        marginBottom: 12,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+function Tag({ text }: { text: string }) {
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginRight: 8,
+      }}
+    >
+      <Text style={{ color: COLORS.textMedium, fontSize: 12 }}>{text}</Text>
+    </View>
+  );
+}
+
+function CheckboxItem({
+  title,
+  checked,
+  onPress,
+}: {
+  title: string;
+  checked: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        backgroundColor: COLORS.surface,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        padding: 12,
+        marginBottom: 8,
+        flexDirection: "row",
+        alignItems: "center",
+        opacity: pressed ? 0.75 : 1,
+      })}
+    >
+      <View
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 3,
+          borderWidth: 1,
+          borderColor: COLORS.textMedium,
+          backgroundColor: checked ? COLORS.text : "transparent",
+          marginRight: 10,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {checked && <Text style={{ color: "#fff", fontSize: 10 }}>✓</Text>}
+      </View>
+      <Text style={{ color: COLORS.text, fontSize: 14, flex: 1 }}>{title}</Text>
+    </Pressable>
+  );
+}
+
+function PrimaryButton({
+  title,
+  onPress,
+  disabled,
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? "#222" : "#111",
+        borderRadius: 8,
+        paddingVertical: 12,
+        alignItems: "center",
+        opacity: disabled ? 0.5 : 1,
+      })}
+    >
+      <Text style={{ color: "#fff", fontSize: 15, fontWeight: "600" }}>
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <View
+      style={{
+        backgroundColor: COLORS.surface,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        padding: 18,
+      }}
+    >
+      <Text
+        style={{ color: COLORS.textMedium, fontSize: 14, textAlign: "center" }}
+      >
+        {message}
+      </Text>
+    </View>
+  );
+}
+
+function SelectionCounter({ count }: { count: number }) {
+  return (
+    <View
+      style={{
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        padding: 10,
+        marginBottom: 10,
+      }}
+    >
+      <Text style={{ color: COLORS.text, fontSize: 14 }}>
+        Selected: {count} exercise{count !== 1 ? "s" : ""}
+      </Text>
+    </View>
+  );
+}
+
+function ScreenHint({ text }: { text: string }) {
+  return (
+    <View
+      style={{
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        marginBottom: 10,
+      }}
+    >
+      <Text style={{ color: COLORS.textMedium, fontSize: 13 }}>{text}</Text>
+    </View>
+  );
+}
+
 export default function Workout() {
   const { width } = useWindowDimensions();
-  const padding = width > 600 ? 40 : 24;
-  
-  const [screen, setScreen] = useState<Screen>('menu');
-  const [selectedExercise, setSelectedExercise] = useState<ExerciseConfig | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState<WorkoutPreset | null>(null);
-  const [customWorkoutName, setCustomWorkoutName] = useState('');
+  const padding = width > 600 ? 40 : 16;
+
+  const [screen, setScreen] = useState<Screen>("menu");
+  const [selectedExercise, setSelectedExercise] =
+    useState<ExerciseConfig | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<WorkoutPreset | null>(
+    null,
+  );
+  const [customWorkoutName, setCustomWorkoutName] = useState("");
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
   const [savedWorkouts, setSavedWorkouts] = useState<CustomWorkout[]>([]);
 
@@ -372,7 +409,9 @@ export default function Workout() {
     const loadCustomWorkouts = async () => {
       if (!auth.currentUser) return;
       try {
-        const q = query(collection(db, `users/${auth.currentUser.uid}/customWorkouts`));
+        const q = query(
+          collection(db, `users/${auth.currentUser.uid}/customWorkouts`),
+        );
         const snapshot = await getDocs(q);
         const workouts: CustomWorkout[] = [];
         snapshot.forEach((doc) => {
@@ -380,7 +419,7 @@ export default function Workout() {
         });
         setSavedWorkouts(workouts);
       } catch (error) {
-        console.log('Error loading custom workouts:', error);
+        console.log("Error loading custom workouts:", error);
       }
     };
     loadCustomWorkouts();
@@ -388,68 +427,110 @@ export default function Workout() {
 
   const saveCustomWorkout = async () => {
     if (!auth.currentUser) {
-      Alert.alert('Error', 'Please login first');
+      Alert.alert("Error", "Please login first");
       return;
     }
     if (!customWorkoutName.trim()) {
-      Alert.alert('Error', 'Please enter a workout name');
+      Alert.alert("Error", "Please enter a workout name");
       return;
     }
     if (selectedExercises.length === 0) {
-      Alert.alert('Error', 'Please select at least one exercise');
+      Alert.alert("Error", "Please select at least one exercise");
       return;
     }
     try {
-      await addDoc(collection(db, `users/${auth.currentUser.uid}/customWorkouts`), {
-        name: customWorkoutName,
-        exercises: selectedExercises,
-        createdAt: new Date().toISOString(),
-      });
-      Alert.alert('Success', 'Workout saved!');
-      setCustomWorkoutName('');
+      await addDoc(
+        collection(db, `users/${auth.currentUser.uid}/customWorkouts`),
+        {
+          name: customWorkoutName,
+          exercises: selectedExercises,
+          createdAt: new Date().toISOString(),
+        },
+      );
+      Alert.alert("Success", "Workout saved!");
+      setCustomWorkoutName("");
       setSelectedExercises([]);
-      setScreen('menu');
+      setScreen("menu");
     } catch (error: any) {
-      Alert.alert('Error', `Failed to save: ${error?.message || 'Unknown'}`);
+      Alert.alert("Error", `Failed to save: ${error?.message || "Unknown"}`);
     }
   };
 
   const toggleExercise = (key: string) => {
-    setSelectedExercises(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+    setSelectedExercises((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
   };
 
   const deleteWorkout = (workoutId: string) => {
-    Alert.alert('Delete Workout', 'Delete this workout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setSavedWorkouts(prev => prev.filter(w => w.id !== workoutId)) }
+    Alert.alert("Delete Workout", "Delete this workout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () =>
+          setSavedWorkouts((prev) => prev.filter((w) => w.id !== workoutId)),
+      },
     ]);
   };
 
   const startWorkoutFromList = (exerciseKeys: string[], index: number = 0) => {
     if (index >= exerciseKeys.length) {
       setSelectedPreset(null);
-      setScreen('menu');
+      setScreen("menu");
       return;
     }
     const exercise = EXERCISES[exerciseKeys[index]];
     if (exercise) setSelectedExercise(exercise);
   };
 
-  // ==================== SINGLE EXERCISE ====================
-  if (screen === 'single') {
+  if (screen === "single") {
     if (selectedExercise == null) {
       return (
         <View style={{ flex: 1, backgroundColor: COLORS.background }}>
           <SafeAreaView style={{ backgroundColor: COLORS.surface }}>
-            <Header title="Exercises" onBack={() => setScreen('menu')} />
+            <Header title="Exercises" onBack={() => setScreen("menu")} />
           </SafeAreaView>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: padding }} showsVerticalScrollIndicator={false}>
-            {(['chest', 'back', 'shoulders', 'arms', 'core', 'legs', 'fullbody', 'cardio', 'stretch'] as MuscleGroup[]).map((group) => {
-              const exercisesInGroup = Object.keys(EXERCISES).filter(key => EXERCISES[key].muscleGroup === group);
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              padding: padding,
+              paddingTop: 12,
+              paddingBottom: 24,
+            }}
+            showsVerticalScrollIndicator={false}
+          >
+            <ScreenHint text="Select one exercise to start camera mode" />
+            {(
+              [
+                "chest",
+                "back",
+                "shoulders",
+                "arms",
+                "core",
+                "legs",
+                "fullbody",
+                "cardio",
+                "stretch",
+              ] as MuscleGroup[]
+            ).map((group) => {
+              const exercisesInGroup = Object.keys(EXERCISES).filter(
+                (key) => EXERCISES[key].muscleGroup === group,
+              );
               if (exercisesInGroup.length === 0) return null;
               return (
-                <View key={group} style={{ marginBottom: 32 }}>
-                  <SectionTitle title={group === 'fullbody' ? 'Full Body' : group === 'cardio' ? 'Cardio' : group === 'stretch' ? 'Stretching' : group} />
+                <GroupBox
+                  key={group}
+                  title={
+                    group === "fullbody"
+                      ? "Full Body"
+                      : group === "cardio"
+                        ? "Cardio"
+                        : group === "stretch"
+                          ? "Stretching"
+                          : group
+                  }
+                >
                   {exercisesInGroup.map((key) => (
                     <ListItem
                       key={key}
@@ -457,56 +538,79 @@ export default function Workout() {
                       onPress={() => setSelectedExercise(EXERCISES[key])}
                     />
                   ))}
-                </View>
+                </GroupBox>
               );
             })}
           </ScrollView>
         </View>
       );
     }
-    return <Camera exercise={selectedExercise} onExit={() => setSelectedExercise(null)} />;
+    return (
+      <Camera
+        exercise={selectedExercise}
+        onExit={() => setSelectedExercise(null)}
+      />
+    );
   }
 
-  // ==================== PRESETS ====================
-  if (screen === 'presets') {
+  if (screen === "presets") {
     if (selectedPreset) {
       const exercises = getPresetExercises(selectedPreset);
       return (
         <View style={{ flex: 1, backgroundColor: COLORS.background }}>
           <SafeAreaView style={{ backgroundColor: COLORS.surface }}>
-            <Header title={selectedPreset.name} onBack={() => setSelectedPreset(null)} />
+            <Header
+              title={selectedPreset.name}
+              onBack={() => setSelectedPreset(null)}
+            />
           </SafeAreaView>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: padding }} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              padding: padding,
+              paddingTop: 12,
+              paddingBottom: 24,
+            }}
+            showsVerticalScrollIndicator={false}
+          >
             <InfoCard>
-              <Text style={{ fontSize: 15, color: COLORS.textMedium, lineHeight: 24, marginBottom: 18 }}>
-                {selectedPreset.description}
-              </Text>
-              <View style={{ flexDirection: 'row' }}>
-                <Tag text={`${exercises.length} exercises`} color={COLORS.primary} bgColor={COLORS.primaryLight} />
-                <Tag text={selectedPreset.difficulty} color={COLORS.secondary} bgColor={COLORS.secondaryLight} />
+              <View style={{ flexDirection: "row" }}>
+                <Tag text={`${exercises.length} exercises`} />
+                <Tag text={selectedPreset.difficulty} />
               </View>
             </InfoCard>
-            
-            <SectionTitle title="Exercises" />
-            {exercises.map((ex, idx) => (
-              <ListItem
-                key={idx}
-                title={ex?.name}
-                index={idx + 1}
-                onPress={() => setSelectedExercise(ex)}
-              />
-            ))}
+
+            <ScreenHint text="Tap any exercise from this preset" />
+            <GroupBox title="Exercises">
+              {exercises.map((ex, idx) => (
+                <ListItem
+                  key={idx}
+                  title={ex?.name}
+                  index={idx + 1}
+                  onPress={() => setSelectedExercise(ex)}
+                />
+              ))}
+            </GroupBox>
           </ScrollView>
         </View>
       );
     }
-    
+
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.background }}>
         <SafeAreaView style={{ backgroundColor: COLORS.surface }}>
-          <Header title="Workout Presets" onBack={() => setScreen('menu')} />
+          <Header title="Workout Presets" onBack={() => setScreen("menu")} />
         </SafeAreaView>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: padding }} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: padding,
+            paddingTop: 12,
+            paddingBottom: 24,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          <ScreenHint text="Choose a preset and start training" />
           {WORKOUT_PRESETS.map((preset) => {
             const exerciseCount = preset.exercises.length;
             return (
@@ -514,26 +618,32 @@ export default function Workout() {
                 key={preset.id}
                 onPress={() => setSelectedPreset(preset)}
                 style={({ pressed }) => ({
-                  backgroundColor: pressed ? COLORS.surfaceAlt : COLORS.surface,
-                  borderRadius: R,
-                  padding: 24,
-                  marginBottom: 16,
+                  backgroundColor: COLORS.surface,
+                  borderRadius: 10,
+                  padding: 14,
+                  marginBottom: 10,
                   borderWidth: 1,
-                  borderColor: pressed ? COLORS.primaryLight : COLORS.border,
-                  ...SHADOWS.medium,
+                  borderColor: COLORS.border,
+                  opacity: pressed ? 0.75 : 1,
                 })}
               >
-                <Text style={{ color: COLORS.text, fontSize: 21, fontWeight: '700', marginBottom: 8 }}>
+                <Text
+                  style={{
+                    color: COLORS.text,
+                    fontSize: 17,
+                    fontWeight: "700",
+                    marginBottom: 8,
+                  }}
+                >
                   {preset.name}
                 </Text>
-                <Text style={{ color: COLORS.textMedium, fontSize: 15, lineHeight: 22, marginBottom: 14 }}>
-                  {preset.description}
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={{ color: COLORS.textLight, fontSize: 14 }}>{exerciseCount} exercises</Text>
-                  <Text style={{ color: COLORS.textLight, fontSize: 14, marginHorizontal: 10 }}>·</Text>
-                  <Text style={{ color: COLORS.primary, fontSize: 14, fontWeight: '600' }}>{preset.difficulty}</Text>
+                <View style={{ flexDirection: "row", marginBottom: 8 }}>
+                  <Tag text={`${exerciseCount} exercises`} />
+                  <Tag text={preset.difficulty} />
                 </View>
+                <Text style={{ color: COLORS.textLight, fontSize: 13 }}>
+                  View exercises
+                </Text>
               </Pressable>
             );
           })}
@@ -542,29 +652,80 @@ export default function Workout() {
     );
   }
 
-  // ==================== CUSTOM SELECT ====================
-  if (screen === 'customSelect') {
+  if (screen === "customSelect") {
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.background }}>
         <SafeAreaView style={{ backgroundColor: COLORS.surface }}>
-          <Header title="Select Exercises" onBack={() => setScreen('custom')} />
+          <Header title="Select Exercises" onBack={() => setScreen("custom")} />
         </SafeAreaView>
-        
-        <View style={{ paddingHorizontal: padding, paddingTop: 20 }}>
+
+        <View style={{ paddingHorizontal: padding, paddingTop: 12 }}>
+          <ScreenHint text="Add a name, then pick exercises" />
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: COLORS.border,
+              borderRadius: 8,
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              marginBottom: 10,
+            }}
+          >
+            <Text
+              style={{ color: COLORS.textLight, fontSize: 12, marginBottom: 4 }}
+            >
+              Workout Name
+            </Text>
+            <TextInput
+              value={customWorkoutName}
+              onChangeText={setCustomWorkoutName}
+              placeholder="Ex: Push day"
+              placeholderTextColor={COLORS.textLight}
+              style={{ color: COLORS.text, fontSize: 15, paddingVertical: 2 }}
+            />
+          </View>
           <SelectionCounter count={selectedExercises.length} />
         </View>
-        
-        <ScrollView 
-          style={{ flex: 1 }} 
-          contentContainerStyle={{ padding: padding, paddingTop: 0 }}
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: padding,
+            paddingTop: 0,
+            paddingBottom: 20,
+          }}
           showsVerticalScrollIndicator={false}
         >
-          {(['chest', 'back', 'shoulders', 'arms', 'core', 'legs', 'fullbody', 'cardio', 'stretch'] as MuscleGroup[]).map((group) => {
-            const exercisesInGroup = Object.keys(EXERCISES).filter(key => EXERCISES[key].muscleGroup === group);
+          {(
+            [
+              "chest",
+              "back",
+              "shoulders",
+              "arms",
+              "core",
+              "legs",
+              "fullbody",
+              "cardio",
+              "stretch",
+            ] as MuscleGroup[]
+          ).map((group) => {
+            const exercisesInGroup = Object.keys(EXERCISES).filter(
+              (key) => EXERCISES[key].muscleGroup === group,
+            );
             if (exercisesInGroup.length === 0) return null;
             return (
-              <View key={group} style={{ marginBottom: 28 }}>
-                <SectionTitle title={group === 'fullbody' ? 'Full Body' : group === 'cardio' ? 'Cardio' : group === 'stretch' ? 'Stretching' : group} />
+              <GroupBox
+                key={group}
+                title={
+                  group === "fullbody"
+                    ? "Full Body"
+                    : group === "cardio"
+                      ? "Cardio"
+                      : group === "stretch"
+                        ? "Stretching"
+                        : group
+                }
+              >
                 {exercisesInGroup.map((key) => {
                   const isSelected = selectedExercises.includes(key);
                   return (
@@ -576,143 +737,169 @@ export default function Workout() {
                     />
                   );
                 })}
-              </View>
+              </GroupBox>
             );
           })}
         </ScrollView>
-        
-        <View style={{ padding: padding, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border }}>
-          <PrimaryButton title="Save Workout" onPress={saveCustomWorkout} disabled={selectedExercises.length === 0} />
+
+        <View
+          style={{
+            padding: padding,
+            borderTopWidth: 1,
+            borderTopColor: COLORS.divider,
+          }}
+        >
+          <PrimaryButton
+            title="Save Workout"
+            onPress={saveCustomWorkout}
+            disabled={selectedExercises.length === 0}
+          />
         </View>
       </View>
     );
   }
 
-  // ==================== CUSTOM ====================
-  if (screen === 'custom') {
+  if (screen === "custom") {
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.background }}>
         <SafeAreaView style={{ backgroundColor: COLORS.surface }}>
-          <Header title="My Workouts" onBack={() => setScreen('menu')} />
+          <Header title="My Workouts" onBack={() => setScreen("menu")} />
         </SafeAreaView>
-        
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: padding }} showsVerticalScrollIndicator={false}>
-          {/* Create New */}
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: padding,
+            paddingTop: 12,
+            paddingBottom: 24,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          <ScreenHint text="Tap to start • Long press to delete" />
+
           <Pressable
-            onPress={() => { setCustomWorkoutName(''); setSelectedExercises([]); setScreen('customSelect'); }}
+            onPress={() => {
+              setCustomWorkoutName("");
+              setSelectedExercises([]);
+              setScreen("customSelect");
+            }}
             style={({ pressed }) => ({
-              backgroundColor: pressed ? COLORS.surfaceAlt : COLORS.surface,
-              borderRadius: R,
-              padding: 28,
-              marginBottom: 32,
-              borderWidth: 2,
-              borderColor: pressed ? COLORS.primary : COLORS.primary,
-              borderStyle: 'dashed',
-              ...SHADOWS.medium,
+              borderWidth: 1,
+              borderColor: COLORS.border,
+              borderRadius: 10,
+              padding: 14,
+              marginBottom: 12,
+              opacity: pressed ? 0.75 : 1,
             })}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: 18 }}>
-                <Text style={{ fontSize: 30, color: COLORS.primary }}>+</Text>
-              </View>
-              <View>
-                <Text style={{ color: COLORS.text, fontSize: 20, fontWeight: '700', marginBottom: 4 }}>Create New</Text>
-                <Text style={{ color: COLORS.textMedium, fontSize: 15 }}>Build your custom routine</Text>
-              </View>
-            </View>
+            <Text
+              style={{
+                color: COLORS.text,
+                fontSize: 16,
+                fontWeight: "700",
+                marginBottom: 3,
+              }}
+            >
+              Create New
+            </Text>
+            <Text style={{ color: COLORS.textMedium, fontSize: 13 }}>
+              Add a new workout
+            </Text>
           </Pressable>
 
-          {/* Saved */}
           {savedWorkouts.length > 0 ? (
-            <View>
-              <SectionTitle title={`Your Workouts (${savedWorkouts.length})`} />
+            <GroupBox title={`Your Workouts (${savedWorkouts.length})`}>
               {savedWorkouts.map((workout) => (
                 <Pressable
                   key={workout.id}
                   onPress={() => startWorkoutFromList(workout.exercises)}
-                  onLongPress={() => deleteWorkout(workout.id || '')}
+                  onLongPress={() => deleteWorkout(workout.id || "")}
                   style={({ pressed }) => ({
-                    backgroundColor: pressed ? COLORS.surfaceAlt : COLORS.surface,
-                    borderRadius: 20,
-                    padding: 22,
-                    marginBottom: 14,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
                     borderWidth: 1,
-                    borderColor: pressed ? COLORS.primaryLight : COLORS.border,
-                    ...SHADOWS.soft,
+                    borderColor: COLORS.border,
+                    borderRadius: 8,
+                    padding: 12,
+                    marginBottom: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    opacity: pressed ? 0.75 : 1,
                   })}
                 >
                   <View>
-                    <Text style={{ color: COLORS.text, fontSize: 18, fontWeight: '600', marginBottom: 4 }}>{workout.name}</Text>
-                    <Text style={{ color: COLORS.textLight, fontSize: 14 }}>{workout.exercises.length} exercises</Text>
+                    <Text
+                      style={{
+                        color: COLORS.text,
+                        fontSize: 15,
+                        fontWeight: "600",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {workout.name}
+                    </Text>
+                    <Text style={{ color: COLORS.textLight, fontSize: 13 }}>
+                      {workout.exercises.length} exercises
+                    </Text>
                   </View>
-                  <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 18, color: COLORS.primary, fontWeight: '300' }}>→</Text>
-                  </View>
+                  <Text style={{ color: COLORS.textLight }}>{">"}</Text>
                 </Pressable>
               ))}
-            </View>
+            </GroupBox>
           ) : (
-            <EmptyState message="No workouts yet.\nCreate your first one!" />
+            <EmptyState message="No workouts yet. Create your first one!" />
           )}
         </ScrollView>
       </View>
     );
   }
 
-  // ==================== MAIN MENU ====================
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-        
-        {/* Header */}
-        <View style={{ alignItems: 'center', paddingTop: 50, paddingBottom: 36 }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: COLORS.primary, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>
-            Fitness
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor={COLORS.background}
+        />
+
+        <View
+          style={{
+            alignItems: "center",
+            paddingTop: 24,
+            paddingBottom: 14,
+            paddingHorizontal: padding,
+          }}
+        >
+          <Text style={{ fontSize: 30, fontWeight: "700", color: COLORS.text }}>
+            Workouts
           </Text>
-          <Text style={{ fontSize: 36, fontWeight: '700', color: COLORS.text, letterSpacing: -0.5 }}>Workouts</Text>
-          <View style={{ width: 56, height: 4, backgroundColor: COLORS.primary, borderRadius: 2, marginTop: 14 }} />
         </View>
 
-        <View style={{ flex: 1, paddingHorizontal: padding, paddingBottom: 40 }}>
-          
-          {/* Preset Workouts */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: padding,
+            paddingBottom: 20,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
           <MenuCard
-            title="Preset Workouts"
-            description="Choose from pre-made workout routines designed for different goals and fitness levels."
-            info="Upper Body · Lower Body · Full Body"
-            color={COLORS.primary}
-            bgColor={COLORS.primaryLight}
-            onPress={() => setScreen('presets')}
-            borderColor={COLORS.primaryLight}
+            title="Workout Presets"
+            subtitle="Ready-made plans"
+            onPress={() => setScreen("presets")}
           />
 
-          {/* My Workouts */}
           <MenuCard
             title="My Workouts"
-            description="Your personal collection of custom workout routines that you've created."
-            info={`${savedWorkouts.length} saved routine${savedWorkouts.length !== 1 ? 's' : ''}`}
-            color={COLORS.secondary}
-            bgColor={COLORS.secondaryLight}
-            onPress={() => setScreen('custom')}
-            borderColor={COLORS.secondaryLight}
+            subtitle="Saved and custom workouts"
+            onPress={() => setScreen("custom")}
           />
 
-          {/* Single Exercise */}
           <MenuCard
             title="Single Exercise"
-            description="Practice and focus on a single exercise. Perfect for learning new movements."
-            info="All muscle groups available"
-            color={COLORS.accent}
-            bgColor={COLORS.accentLight}
-            onPress={() => setScreen('single')}
-            borderColor={COLORS.accentLight}
+            subtitle="Train one movement"
+            onPress={() => setScreen("single")}
           />
-
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
