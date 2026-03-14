@@ -54,7 +54,11 @@ interface UserData {
   plan?: {
     dailyCalories: number;
     dailyProtein: number;
+    dailyCarbs?: number | string;
+    dailyFat?: number | string;
+    dailyVitamins?: string;
   };
+  hasHealthCondition?: boolean;
   progress?: ProgressEntry[];
   streak?: number;
   lastLogDate?: string;
@@ -242,6 +246,13 @@ export default function Profile() {
 
   const dailyCalories = userData.plan?.dailyCalories ?? 2000;
   const dailyProtein = userData.plan?.dailyProtein ?? 150;
+  const dailyCarbs = userData.plan?.dailyCarbs
+    ? Number(userData.plan.dailyCarbs)
+    : undefined;
+  const dailyFat = userData.plan?.dailyFat
+    ? Number(userData.plan.dailyFat)
+    : undefined;
+  const dailyVitamins = userData.plan?.dailyVitamins;
 
   const todayEntry = progress.find((p) => p.date === TODAY);
 
@@ -386,6 +397,21 @@ export default function Profile() {
             </View>
           </View>
         </View>
+
+        {userData.hasHealthCondition && (dailyCarbs || dailyFat || dailyVitamins) && (
+          <View style={s.card}>
+            <SectionLabel label="Plan special" />
+            {dailyCarbs !== undefined && (
+              <Text style={s.specialLine}>Carbohidrați: {dailyCarbs} g</Text>
+            )}
+            {dailyFat !== undefined && (
+              <Text style={s.specialLine}>Grăsimi: {dailyFat} g</Text>
+            )}
+            {dailyVitamins ? (
+              <Text style={s.specialLine}>Vitamine: {dailyVitamins}</Text>
+            ) : null}
+          </View>
+        )}
 
         {/* Weight log */}
         <View style={s.card}>
@@ -719,4 +745,5 @@ const s = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
+  specialLine: { fontSize: 14, color: C.text, marginBottom: 6, fontWeight: "600" },
 });

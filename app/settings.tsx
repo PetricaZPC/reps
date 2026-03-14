@@ -44,7 +44,14 @@ interface UserData {
   targetWeight: string;
   activityLevel: string;
   goal: string;
-  plan?: any;
+  hasHealthCondition?: boolean;
+  plan?: {
+    dailyCalories?: number | string;
+    dailyProtein?: number | string;
+    dailyCarbs?: number | string;
+    dailyFat?: number | string;
+    dailyVitamins?: string;
+  };
   progress?: { date: string; weight: number; protein: number }[];
 }
 
@@ -56,6 +63,8 @@ const EMPTY: UserData = {
   targetWeight: "",
   activityLevel: "",
   goal: "",
+  hasHealthCondition: false,
+  plan: {},
   progress: [],
 };
 
@@ -93,6 +102,25 @@ function Field({
         autoCapitalize="none"
       />
     </View>
+  );
+}
+
+function ToggleRow({
+  label,
+  value,
+  onToggle,
+}: {
+  label: string;
+  value: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <TouchableOpacity style={s.toggleRow} onPress={onToggle} activeOpacity={0.8}>
+      <View style={[s.toggleDot, value && s.toggleDotOn]}>
+        <View style={[s.toggleKnob, value && s.toggleKnobOn]} />
+      </View>
+      <Text style={s.toggleLabel}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -336,6 +364,16 @@ export default function Settings() {
 
           {editing ? (
             <>
+              <ToggleRow
+                label="Am condiții medicale (plan special)"
+                value={!!userData.hasHealthCondition}
+                onToggle={() =>
+                  setUserData({
+                    ...userData,
+                    hasHealthCondition: !userData.hasHealthCondition,
+                  })
+                }
+              />
               <View style={s.fieldRow}>
                 <View style={{ flex: 1 }}>
                   <Field
@@ -398,9 +436,53 @@ export default function Settings() {
                 onChangeText={(v) => setUserData({ ...userData, goal: v })}
                 placeholder="slăbire / menținere / masă musculară"
               />
+
+              {userData.hasHealthCondition && (
+                <>
+                  <SectionLabel label="Plan special nutrienți" />
+                  <Field
+                    label="Carbohidrați țintă (g)"
+                    value={userData.plan?.dailyCarbs?.toString() ?? ""}
+                    onChangeText={(v) =>
+                      setUserData({
+                        ...userData,
+                        plan: { ...userData.plan, dailyCarbs: v },
+                      })
+                    }
+                    keyboard="numeric"
+                  />
+                  <Field
+                    label="Grăsimi țintă (g)"
+                    value={userData.plan?.dailyFat?.toString() ?? ""}
+                    onChangeText={(v) =>
+                      setUserData({
+                        ...userData,
+                        plan: { ...userData.plan, dailyFat: v },
+                      })
+                    }
+                    keyboard="numeric"
+                  />
+                  <Field
+                    label="Vitamine / note speciale"
+                    value={userData.plan?.dailyVitamins ?? ""}
+                    onChangeText={(v) =>
+                      setUserData({
+                        ...userData,
+                        plan: { ...userData.plan, dailyVitamins: v },
+                      })
+                    }
+                    placeholder="ex: complex B, D3 2000UI, magneziu"
+                  />
+                </>
+              )}
             </>
           ) : (
             <>
+              <InfoRow
+                icon="medkit-outline"
+                label="Plan special sănătate"
+                value={userData.hasHealthCondition ? "Da" : "Nu"}
+              />
               <InfoRow
                 icon="calendar-outline"
                 label="Vârstă"
@@ -434,6 +516,25 @@ export default function Settings() {
                 label="Obiectiv"
                 value={userData.goal}
               />
+              {userData.hasHealthCondition && (
+                <>
+                  <InfoRow
+                    icon="leaf-outline"
+                    label="Carbohidrați"
+                    value={userData.plan?.dailyCarbs ? `${userData.plan.dailyCarbs} g` : "—"}
+                  />
+                  <InfoRow
+                    icon="egg-outline"
+                    label="Grăsimi"
+                    value={userData.plan?.dailyFat ? `${userData.plan.dailyFat} g` : "—"}
+                  />
+                  <InfoRow
+                    icon="heart-outline"
+                    label="Vitamine / note"
+                    value={userData.plan?.dailyVitamins || "—"}
+                  />
+                </>
+              )}
             </>
           )}
         </View>
@@ -696,6 +797,40 @@ const s = StyleSheet.create({
     color: "#fff",
     fontSize: 13,
     fontWeight: "700",
+  },
+
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 6,
+    marginBottom: 10,
+  },
+  toggleDot: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: C.border,
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  toggleDotOn: {
+    backgroundColor: C.accent,
+  },
+  toggleKnob: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#fff",
+    transform: [{ translateX: 0 }],
+  },
+  toggleKnobOn: {
+    transform: [{ translateX: 18 }],
+  },
+  toggleLabel: {
+    fontSize: 14,
+    color: C.text,
+    fontWeight: "600",
   },
 
   // Action row
