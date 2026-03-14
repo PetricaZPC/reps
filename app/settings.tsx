@@ -1,16 +1,42 @@
+import { Ionicons } from "@expo/vector-icons";
 import { sendPasswordResetEmail, updateEmail } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { auth, db } from "../firebase/firebaseConfig";
 
+// ─── Design tokens ──────────────────────────────────────────
+const C = {
+  bg: "#F7F8FA",
+  glass: "rgba(255,255,255,0.72)",
+  glassBorder: "rgba(255,255,255,0.9)",
+  surface: "#FFFFFF",
+  accent: "#4F6EF7",
+  accentLight: "#EEF1FF",
+  warning: "#F97316",
+  warningLight: "#FFF0E8",
+  danger: "#EF4444",
+  dangerLight: "#FEE2E2",
+  text: "#0F0F10",
+  textMuted: "#8A8FA8",
+  textLight: "#B8BCCD",
+  border: "rgba(0,0,0,0.07)",
+  blob1: "#E8EDFF",
+  blob2: "#F0E8FF",
+};
+
+// ─── Types ──────────────────────────────────────────────────
 interface UserData {
   age: string;
   weight: string;
@@ -23,21 +49,97 @@ interface UserData {
   progress?: { date: string; weight: number; protein: number }[];
 }
 
-const EMPTY_USER_DATA: UserData = {
-  age: "",
-  weight: "",
-  height: "",
-  sex: "",
-  targetWeight: "",
-  activityLevel: "",
-  goal: "",
-  progress: [],
+const EMPTY: UserData = {
+  age: "", weight: "", height: "", sex: "",
+  targetWeight: "", activityLevel: "", goal: "", progress: [],
 };
 
+// ─── Sub-components ─────────────────────────────────────────
+function SectionLabel({ label }: { label: string }) {
+  return <Text style={s.sectionLabel}>{label}</Text>;
+}
+
+function Field({
+  label,
+  value,
+  onChangeText,
+  keyboard,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  keyboard?: any;
+  placeholder?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={s.fieldWrap}>
+      <Text style={s.fieldLabel}>{label}</Text>
+      <TextInput
+        style={[s.input, focused && s.inputFocused]}
+        value={value}
+        placeholder={placeholder}
+        placeholderTextColor={C.textLight}
+        onChangeText={onChangeText}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        keyboardType={keyboard}
+        autoCapitalize="none"
+      />
+    </View>
+  );
+}
+
+function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <View style={s.infoRow}>
+      <View style={s.infoIcon}>
+        <Ionicons name={icon} size={15} color={C.accent} />
+      </View>
+      <Text style={s.infoLabel}>{label}</Text>
+      <Text style={s.infoValue}>{value || "—"}</Text>
+    </View>
+  );
+}
+
+function ActionRow({
+  icon,
+  label,
+  sublabel,
+  onPress,
+  color = C.accent,
+  bgColor = C.accentLight,
+  danger = false,
+}: {
+  icon: any;
+  label: string;
+  sublabel?: string;
+  onPress: () => void;
+  color?: string;
+  bgColor?: string;
+  danger?: boolean;
+}) {
+  return (
+    <TouchableOpacity style={s.actionRow} onPress={onPress} activeOpacity={0.75}>
+      <View style={[s.actionIcon, { backgroundColor: bgColor }]}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[s.actionLabel, danger && { color: C.danger }]}>{label}</Text>
+        {sublabel && <Text style={s.actionSublabel}>{sublabel}</Text>}
+      </View>
+      {!danger && <Ionicons name="chevron-forward" size={16} color={C.textLight} />}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main ───────────────────────────────────────────────────
 export default function Settings() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [editing, setEditing] = useState(false);
   const [newEmail, setNewEmail] = useState("");
+  const [emailFocused, setEmailFocused] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -47,49 +149,38 @@ export default function Settings() {
   const loadUserData = async () => {
     try {
       const user = auth.currentUser;
-      if (!user) {
-        setUserData(EMPTY_USER_DATA);
-        return;
-      }
-
+      if (!user) { setUserData(EMPTY); return; }
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
-
       if (docSnap.exists()) {
-        setUserData({ ...EMPTY_USER_DATA, ...(docSnap.data() as UserData) });
+        setUserData({ ...EMPTY, ...(docSnap.data() as UserData) });
       } else {
-        await setDoc(docRef, EMPTY_USER_DATA, { merge: true });
-        setUserData(EMPTY_USER_DATA);
+        await setDoc(docRef, EMPTY, { merge: true });
+        setUserData(EMPTY);
       }
-    } catch (error) {
-      console.log("Error loading settings profile:", error);
-      setUserData(EMPTY_USER_DATA);
+    } catch {
+      setUserData(EMPTY);
     }
   };
 
   const saveData = async () => {
     const user = auth.currentUser;
     if (!user || !userData) return;
-
     try {
-      await setDoc(doc(db, "users", user.uid), userData as any, {
-        merge: true,
-      });
+      await setDoc(doc(db, "users", user.uid), userData as any, { merge: true });
       setEditing(false);
       Alert.alert("Salvat!", "Datele personale au fost actualizate.");
-    } catch (error) {
-      Alert.alert("Eroare", "Nu am putut salva datele personale.");
+    } catch {
+      Alert.alert("Eroare", "Nu am putut salva datele.");
     }
   };
 
   const onChangeEmail = async () => {
     const user = auth.currentUser;
-    if (!user) return;
-    if (!newEmail.trim()) {
+    if (!user || !newEmail.trim()) {
       Alert.alert("Eroare", "Introdu un email valid.");
       return;
     }
-
     try {
       await updateEmail(user, newEmail.trim());
       Alert.alert("Succes", "Email-ul a fost actualizat.");
@@ -97,7 +188,7 @@ export default function Settings() {
       if (error?.code === "auth/requires-recent-login") {
         Alert.alert(
           "Reautentificare necesară",
-          "Pentru schimbarea email-ului, fă logout și login din nou.",
+          "Pentru a schimba email-ul, fă logout și autentifică-te din nou."
         );
       } else {
         Alert.alert("Eroare", "Nu am putut actualiza email-ul.");
@@ -107,154 +198,406 @@ export default function Settings() {
 
   const onResetPassword = async () => {
     const email = auth.currentUser?.email;
-    if (!email) {
-      Alert.alert("Eroare", "Nu există email asociat contului.");
-      return;
-    }
-
-    try {
-      await sendPasswordResetEmail(auth, email);
-      Alert.alert(
-        "Email trimis",
-        "Verifică inbox-ul pentru resetarea parolei.",
-      );
-    } catch (error) {
-      Alert.alert("Eroare", "Nu am putut trimite email-ul de resetare.");
-    }
+    if (!email) { Alert.alert("Eroare", "Nu există email asociat contului."); return; }
+    Alert.alert(
+      "Resetează parola",
+      `Trimitem un email de resetare la ${email}.`,
+      [
+        { text: "Anulează", style: "cancel" },
+        {
+          text: "Trimite",
+          onPress: async () => {
+            try {
+              await sendPasswordResetEmail(auth, email);
+              Alert.alert("Email trimis!", "Verifică inbox-ul.");
+            } catch {
+              Alert.alert("Eroare", "Nu am putut trimite email-ul.");
+            }
+          },
+        },
+      ]
+    );
   };
 
-  if (!userData) return <Text>Loading...</Text>;
+  if (!userData) {
+    return (
+      <View style={[s.root, { alignItems: "center", justifyContent: "center" }]}>
+        <Text style={{ color: C.textMuted }}>Se încarcă...</Text>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView className="flex-1 bg-white">
-      <View className="pt-12 pb-4 px-4 border-b border-gray-200">
-        <Text className="text-xl font-bold">Settings</Text>
-      </View>
+    <View style={s.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
-      <View className="px-4 py-4">
-        <Text className="text-lg font-bold mb-4">Detalii personale</Text>
-        {editing ? (
-          <>
-            <TextInput
-              className="border border-gray-300 rounded px-3 py-2 mb-2"
-              placeholder="Vârstă"
-              value={userData.age}
-              onChangeText={(v) => setUserData({ ...userData, age: v })}
-            />
-            <TextInput
-              className="border border-gray-300 rounded px-3 py-2 mb-2"
-              placeholder="Greutate"
-              value={userData.weight}
-              onChangeText={(v) => setUserData({ ...userData, weight: v })}
-            />
-            <TextInput
-              className="border border-gray-300 rounded px-3 py-2 mb-2"
-              placeholder="Înălțime"
-              value={userData.height}
-              onChangeText={(v) => setUserData({ ...userData, height: v })}
-            />
-            <TextInput
-              className="border border-gray-300 rounded px-3 py-2 mb-2"
-              placeholder="Sex"
-              value={userData.sex}
-              onChangeText={(v) => setUserData({ ...userData, sex: v })}
-            />
-            <TextInput
-              className="border border-gray-300 rounded px-3 py-2 mb-2"
-              placeholder="Greutate țintă"
-              value={userData.targetWeight}
-              onChangeText={(v) =>
-                setUserData({ ...userData, targetWeight: v })
-              }
-            />
-            <TextInput
-              className="border border-gray-300 rounded px-3 py-2 mb-2"
-              placeholder="Nivel activitate"
-              value={userData.activityLevel}
-              onChangeText={(v) =>
-                setUserData({ ...userData, activityLevel: v })
-              }
-            />
-            <TextInput
-              className="border border-gray-300 rounded px-3 py-2 mb-4"
-              placeholder="Obiectiv"
-              value={userData.goal}
-              onChangeText={(v) => setUserData({ ...userData, goal: v })}
-            />
-            <View className="flex-row gap-2">
-              <Pressable
-                onPress={saveData}
-                className="bg-blue-500 px-4 py-2 rounded"
+      {/* Blobs */}
+      <View style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]} />
+      <View style={[s.blob, { bottom: 200, left: -100, width: 240, height: 240, backgroundColor: C.blob2 }]} />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ── Header ── */}
+        <View style={s.pageHeader}>
+          <View style={s.pageIconWrap}>
+            <Ionicons name="settings-outline" size={22} color={C.accent} />
+          </View>
+          <View>
+            <Text style={s.pageTitle}>Setări</Text>
+            <Text style={s.pageSubtitle}>{auth.currentUser?.email}</Text>
+          </View>
+        </View>
+
+        {/* ── Personal info ── */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <SectionLabel label="Date personale" />
+            {editing ? (
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => setEditing(false)}
+                  style={[s.editBtn, { borderColor: C.textLight }]}
+                >
+                  <Text style={[s.editBtnText, { color: C.textMuted }]}>Anulează</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={saveData}
+                  style={[s.editBtn, { backgroundColor: C.accent, borderColor: C.accent }]}
+                >
+                  <Ionicons name="checkmark" size={13} color="#fff" />
+                  <Text style={[s.editBtnText, { color: "#fff" }]}>Salvează</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => setEditing(true)} style={s.editBtn}>
+                <Ionicons name="pencil" size={13} color={C.accent} />
+                <Text style={s.editBtnText}>Editează</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {editing ? (
+            <>
+              <View style={s.fieldRow}>
+                <View style={{ flex: 1 }}>
+                  <Field label="Vârstă" value={userData.age} onChangeText={(v) => setUserData({ ...userData, age: v })} keyboard="numeric" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Field label="Sex" value={userData.sex} onChangeText={(v) => setUserData({ ...userData, sex: v })} placeholder="M / F" />
+                </View>
+              </View>
+              <View style={s.fieldRow}>
+                <View style={{ flex: 1 }}>
+                  <Field label="Greutate (kg)" value={userData.weight} onChangeText={(v) => setUserData({ ...userData, weight: v })} keyboard="numeric" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Field label="Înălțime (cm)" value={userData.height} onChangeText={(v) => setUserData({ ...userData, height: v })} keyboard="numeric" />
+                </View>
+              </View>
+              <Field label="Greutate țintă (kg)" value={userData.targetWeight} onChangeText={(v) => setUserData({ ...userData, targetWeight: v })} keyboard="numeric" />
+              <Field label="Nivel activitate" value={userData.activityLevel} onChangeText={(v) => setUserData({ ...userData, activityLevel: v })} placeholder="sedentar / moderat / activ" />
+              <Field label="Obiectiv" value={userData.goal} onChangeText={(v) => setUserData({ ...userData, goal: v })} placeholder="slăbire / menținere / masă musculară" />
+            </>
+          ) : (
+            <>
+              <InfoRow icon="calendar-outline" label="Vârstă" value={userData.age ? `${userData.age} ani` : ""} />
+              <InfoRow icon="scale-outline" label="Greutate" value={userData.weight ? `${userData.weight} kg` : ""} />
+              <InfoRow icon="resize-outline" label="Înălțime" value={userData.height ? `${userData.height} cm` : ""} />
+              <InfoRow icon="person-outline" label="Sex" value={userData.sex} />
+              <InfoRow icon="flag-outline" label="Greutate țintă" value={userData.targetWeight ? `${userData.targetWeight} kg` : ""} />
+              <InfoRow icon="flash-outline" label="Activitate" value={userData.activityLevel} />
+              <InfoRow icon="trophy-outline" label="Obiectiv" value={userData.goal} />
+            </>
+          )}
+        </View>
+
+        {/* ── Account / Email ── */}
+        <View style={s.card}>
+          <SectionLabel label="Cont" />
+
+          <View style={s.fieldWrap}>
+            <Text style={s.fieldLabel}>Adresă de email</Text>
+            <View style={s.emailRow}>
+              <TextInput
+                style={[s.input, { flex: 1, marginBottom: 0 }, emailFocused && s.inputFocused]}
+                value={newEmail}
+                onChangeText={setNewEmail}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor={C.textLight}
+              />
+              <TouchableOpacity
+                style={s.emailBtn}
+                onPress={onChangeEmail}
+                activeOpacity={0.85}
               >
-                <Text className="text-white">Salvează</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setEditing(false)}
-                className="bg-gray-300 px-4 py-2 rounded"
-              >
-                <Text>Anulează</Text>
-              </Pressable>
+                <Text style={s.emailBtnText}>Actualizează</Text>
+              </TouchableOpacity>
             </View>
-          </>
-        ) : (
-          <>
-            <Text>Vârstă: {userData.age}</Text>
-            <Text>Greutate: {userData.weight}kg</Text>
-            <Text>Înălțime: {userData.height}cm</Text>
-            <Text>Sex: {userData.sex}</Text>
-            <Text>Greutate țintă: {userData.targetWeight}kg</Text>
-            <Text>Nivel activitate: {userData.activityLevel}</Text>
-            <Text>Obiectiv: {userData.goal}</Text>
-            <Pressable
-              onPress={() => setEditing(true)}
-              className="bg-blue-500 px-4 py-2 rounded mt-4"
-            >
-              <Text className="text-white">Editează</Text>
-            </Pressable>
-          </>
-        )}
+            <Text style={s.fieldHint}>
+              Necesită reautentificare recentă pentru a schimba email-ul.
+            </Text>
+          </View>
+        </View>
 
-        <Text className="text-lg font-bold mt-8 mb-4">Cont</Text>
+        {/* ── Quick actions ── */}
+        <View style={s.card}>
+          <SectionLabel label="Securitate" />
+          <ActionRow
+            icon="lock-closed-outline"
+            label="Resetează parola"
+            sublabel="Primești un email de resetare"
+            onPress={onResetPassword}
+            color={C.warning}
+            bgColor={C.warningLight}
+          />
+        </View>
 
-        <Text className="text-sm text-gray-600 mb-2">Schimbă email</Text>
-        <TextInput
-          className="border border-gray-300 rounded px-3 py-2 mb-2"
-          placeholder="Email nou"
-          value={newEmail}
-          onChangeText={setNewEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <Pressable
-          onPress={onChangeEmail}
-          className="bg-indigo-500 px-4 py-2 rounded mb-4"
-        >
-          <Text className="text-white">Actualizează email</Text>
-        </Pressable>
+        {/* ── Danger zone ── */}
+        <View style={s.card}>
+          <SectionLabel label="Sesiune" />
+          <ActionRow
+            icon="log-out-outline"
+            label="Deconectează-te"
+            onPress={() =>
+              Alert.alert("Ești sigur?", "Vei fi deconectat din cont.", [
+                { text: "Anulează", style: "cancel" },
+                { text: "Logout", style: "destructive", onPress: () => auth.signOut() },
+              ])
+            }
+            color={C.danger}
+            bgColor={C.dangerLight}
+            danger
+          />
+        </View>
 
-        <Pressable
-          onPress={onResetPassword}
-          className="bg-orange-500 px-4 py-2 rounded mb-4"
-        >
-          <Text className="text-white">Resetează parola</Text>
-        </Pressable>
+        {/* App version */}
+        <Text style={s.version}>REPS · v1.0.0</Text>
 
-        <Pressable
-          onPress={() =>
-            Alert.alert("Confirmare", "Sigur vrei să te deloghezi?", [
-              { text: "Nu", style: "cancel" },
-              {
-                text: "Da",
-                style: "destructive",
-                onPress: () => auth.signOut(),
-              },
-            ])
-          }
-          className="bg-red-500 px-4 py-2 rounded mb-10"
-        >
-          <Text className="text-white">Logout</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
   );
 }
+
+// ─── Styles ─────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  blob: {
+    position: "absolute",
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    opacity: 0.5,
+  },
+  scroll: {
+    paddingTop: Platform.OS === "ios" ? 60 : 44,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 14,
+  },
+
+  // Page header
+  pageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginBottom: 4,
+  },
+  pageIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: C.accentLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: C.text,
+    letterSpacing: -0.5,
+  },
+  pageSubtitle: {
+    fontSize: 12,
+    color: C.textMuted,
+    marginTop: 2,
+  },
+
+  // Card
+  card: {
+    backgroundColor: C.glass,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.glassBorder,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+
+  // Section label
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.accent,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+    marginBottom: 14,
+  },
+
+  // Edit button
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: C.accent,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  editBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.accent,
+  },
+
+  // Info row (view mode)
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  infoIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: C.accentLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  infoLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: C.textMuted,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.text,
+  },
+
+  // Field (edit mode)
+  fieldRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  fieldWrap: {
+    marginBottom: 10,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 5,
+  },
+  fieldHint: {
+    fontSize: 11,
+    color: C.textLight,
+    marginTop: 6,
+  },
+  input: {
+    backgroundColor: C.bg,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: C.text,
+    marginBottom: 0,
+  },
+  inputFocused: {
+    borderColor: C.accent,
+    backgroundColor: C.accentLight,
+  },
+
+  // Email row
+  emailRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  emailBtn: {
+    backgroundColor: C.accent,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emailBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  // Action row
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+  },
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: C.text,
+  },
+  actionSublabel: {
+    fontSize: 12,
+    color: C.textMuted,
+    marginTop: 1,
+  },
+
+  // Version
+  version: {
+    textAlign: "center",
+    fontSize: 12,
+    color: C.textLight,
+    letterSpacing: 1,
+    marginTop: 4,
+  },
+});

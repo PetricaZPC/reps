@@ -1,23 +1,23 @@
 import { addDoc, collection, getDocs, query } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
-  Alert,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
+    Alert,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    Text,
+    TextInput,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { auth, db } from "../firebase/firebaseConfig";
 import Camera from "../src/Camera";
 import { EXERCISES, ExerciseConfig, MuscleGroup } from "../src/exercises";
 import {
-  WORKOUT_PRESETS,
-  WorkoutPreset,
-  getPresetExercises,
+    WORKOUT_PRESETS,
+    WorkoutPreset,
+    getPresetExercises,
 } from "../src/workoutPresets";
 
 type Screen =
