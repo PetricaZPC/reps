@@ -59,6 +59,7 @@ interface UserData {
     dailyVitamins?: string;
   };
   hasHealthCondition?: boolean;
+  healthConditionName?: string;
   progress?: ProgressEntry[];
   streak?: number;
   lastLogDate?: string;
@@ -112,6 +113,7 @@ export default function Profile() {
 
   const consumedCalories = passData((state) => state.calories) ?? 0;
   const consumedProtein = passData((state) => state.protein) ?? 0;
+  const consumedCarbs = passData((state) => state.carbs) ?? 0;
 
   function hitDailyGoal(
     goal: string | undefined,
@@ -253,6 +255,7 @@ export default function Profile() {
     ? Number(userData.plan.dailyFat)
     : undefined;
   const dailyVitamins = userData.plan?.dailyVitamins;
+  const healthCondition = userData.healthConditionName;
 
   const todayEntry = progress.find((p) => p.date === TODAY);
 
@@ -348,7 +351,7 @@ export default function Profile() {
               </Text>
             </View>
             <View style={s.snapshotItem}>
-              <Text style={s.snapshotLabel}>Tint03</Text>
+              <Text style={s.snapshotLabel}>Țintă</Text>
               <Text style={s.snapshotValue}>
                 {targetWeight ? `${targetWeight.toFixed(1)} kg` : "–"}
               </Text>
@@ -369,6 +372,14 @@ export default function Profile() {
         {/* Targets */}
         <View style={s.card}>
           <SectionLabel label="Target de azi" />
+          {userData.hasHealthCondition && (
+            <View style={s.conditionNote}>
+              <Ionicons name="medkit-outline" size={15} color={C.accent} />
+              <Text style={s.conditionNoteText}>
+                Plan special {healthCondition ? `pentru ${healthCondition}` : "activ"}
+              </Text>
+            </View>
+          )}
           <MacroBar
             label="Calorii"
             value={consumedCalories}
@@ -383,6 +394,15 @@ export default function Profile() {
             color={C.accent}
             unit="g"
           />
+          {dailyCarbs !== undefined && (
+            <MacroBar
+              label="Carbohidrați"
+              value={consumedCarbs}
+              target={dailyCarbs}
+              color="#10B981"
+              unit="g"
+            />
+          )}
 
           <View style={s.remainRow}>
             <View style={[s.remainChip, { backgroundColor: "#FFF0E8" }]}>
@@ -395,12 +415,33 @@ export default function Profile() {
                 {Math.max(dailyProtein - consumedProtein, 0)}g proteina ramasa
               </Text>
             </View>
+            {dailyCarbs !== undefined && (
+              <View style={[s.remainChip, { backgroundColor: "#ECFDF3" }]}>
+                <Text style={[s.remainChipText, { color: "#15803D" }]}>
+                  {Math.max(dailyCarbs - consumedCarbs, 0)}g carbo ramasi
+                </Text>
+              </View>
+            )}
           </View>
+
+          {dailyFat !== undefined || dailyVitamins ? (
+            <View style={s.specialNoteRow}>
+              {dailyFat !== undefined && (
+                <Text style={s.specialNoteText}>Grăsimi țintă: {dailyFat} g</Text>
+              )}
+              {dailyVitamins ? (
+                <Text style={s.specialNoteText}>Vitamine / note: {dailyVitamins}</Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
-        {userData.hasHealthCondition && (dailyCarbs || dailyFat || dailyVitamins) && (
+        {userData.hasHealthCondition && (healthCondition || dailyCarbs || dailyFat || dailyVitamins) && (
           <View style={s.card}>
             <SectionLabel label="Plan special" />
+            {healthCondition ? (
+              <Text style={s.specialLine}>Condiție: {healthCondition}</Text>
+            ) : null}
             {dailyCarbs !== undefined && (
               <Text style={s.specialLine}>Carbohidrați: {dailyCarbs} g</Text>
             )}
@@ -681,6 +722,19 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   remainChipText: { fontSize: 12, fontWeight: "600" },
+  conditionNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+    backgroundColor: C.accentLight,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  conditionNoteText: { fontSize: 13, color: C.text, fontWeight: "700" },
+  specialNoteRow: { gap: 6, marginTop: 8 },
+  specialNoteText: { fontSize: 12, color: C.textMuted },
 
   weightRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   weightInput: {

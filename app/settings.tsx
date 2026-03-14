@@ -45,6 +45,7 @@ interface UserData {
   activityLevel: string;
   goal: string;
   hasHealthCondition?: boolean;
+  healthConditionName?: string;
   plan?: {
     dailyCalories?: number | string;
     dailyProtein?: number | string;
@@ -64,9 +65,56 @@ const EMPTY: UserData = {
   activityLevel: "",
   goal: "",
   hasHealthCondition: false,
+  healthConditionName: "",
   plan: {},
   progress: [],
 };
+
+// Small heuristic to prefill special plan targets based on the named condition
+function getSuggestedSpecialPlan(condition: string) {
+  const c = condition.toLowerCase().trim();
+  if (!c) return undefined;
+  if (c.includes("diab")) {
+    return {
+      dailyCarbs: 150,
+      dailyFat: 60,
+      dailyVitamins: "Omega-3, Magneziu, Vitamina D",
+    };
+  }
+  if (c.includes("tensiune") || c.includes("hipert")) {
+    return {
+      dailyCarbs: 180,
+      dailyFat: 65,
+      dailyVitamins: "Magneziu, Potasiu, Omega-3",
+    };
+  }
+  if (c.includes("anemie")) {
+    return {
+      dailyCarbs: 200,
+      dailyFat: 70,
+      dailyVitamins: "Fier, B12, Folat, Vitamina C",
+    };
+  }
+  if (c.includes("colesterol") || c.includes("dislip")) {
+    return {
+      dailyCarbs: 190,
+      dailyFat: 55,
+      dailyVitamins: "Omega-3, Fibre 25-30g, Steroli vegetali",
+    };
+  }
+  if (c.includes("tiroid")) {
+    return {
+      dailyCarbs: 190,
+      dailyFat: 65,
+      dailyVitamins: "Iod moderat, Seleniu, Vitamina D",
+    };
+  }
+  return {
+    dailyCarbs: 200,
+    dailyFat: 70,
+    dailyVitamins: "Multivitamine, Omega-3, Magneziu",
+  };
+}
 
 // ─── Sub-components ─────────────────────────────────────────
 function SectionLabel({ label }: { label: string }) {
@@ -367,13 +415,33 @@ export default function Settings() {
               <ToggleRow
                 label="Am condiții medicale (plan special)"
                 value={!!userData.hasHealthCondition}
-                onToggle={() =>
+                onToggle={() => {
+                  const next = !userData.hasHealthCondition;
                   setUserData({
                     ...userData,
-                    hasHealthCondition: !userData.hasHealthCondition,
-                  })
-                }
+                    hasHealthCondition: next,
+                    healthConditionName: next ? userData.healthConditionName : "",
+                  });
+                }}
               />
+              {userData.hasHealthCondition && (
+                <Field
+                  label="Condiție medicală"
+                  value={userData.healthConditionName ?? ""}
+                  onChangeText={(v) => {
+                    const suggestion = getSuggestedSpecialPlan(v);
+                    const nextPlan = suggestion
+                      ? { ...(userData.plan ?? {}), ...suggestion }
+                      : userData.plan;
+                    setUserData({
+                      ...userData,
+                      healthConditionName: v,
+                      plan: nextPlan,
+                    });
+                  }}
+                  placeholder="ex: diabet, hipertensiune"
+                />
+              )}
               <View style={s.fieldRow}>
                 <View style={{ flex: 1 }}>
                   <Field
@@ -482,6 +550,11 @@ export default function Settings() {
                 icon="medkit-outline"
                 label="Plan special sănătate"
                 value={userData.hasHealthCondition ? "Da" : "Nu"}
+              />
+              <InfoRow
+                icon="alert-circle-outline"
+                label="Condiție medicală"
+                value={userData.healthConditionName || "—"}
               />
               <InfoRow
                 icon="calendar-outline"
