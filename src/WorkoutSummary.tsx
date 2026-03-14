@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { WorkoutResult } from "./WorkoutSession";
-import { WorkoutPreset } from "./workouts";
+import { WorkoutPreset } from "./workoutPresets";
 
 interface Props {
   preset: WorkoutPreset;
