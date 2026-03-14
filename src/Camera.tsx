@@ -276,7 +276,7 @@ export default function Camera({ exercise, onExit }: CameraProps) {
                     ? `⏱ ${formatTime(seconds)}`
                     : `Reps: ${reps}`
                 }
-           das </Text>
+            </Text>
         </View>
     );
 }
