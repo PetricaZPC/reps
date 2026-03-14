@@ -63,7 +63,7 @@ interface Props {
   onExit: () => void;
 }
 
-type Phase = 'exercise' | 'rest_between_sets' | 'rest_between_exercises';
+type Phase = 'exercise_intro' | 'exercise' | 'rest_between_sets' | 'rest_between_exercises';
 
 export default function WorkoutSession({ preset, customRestTime, onFinish, onExit }: Props) {
   const totalSets = getSets(preset.difficulty);
@@ -71,7 +71,7 @@ export default function WorkoutSession({ preset, customRestTime, onFinish, onExi
 
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [setIndex, setSetIndex] = useState(0);
-  const [phase, setPhase] = useState<Phase>('exercise');
+  const [phase, setPhase] = useState<Phase>('exercise_intro');
   const [restCountdown, setRestCountdown] = useState(0);
   const [results, setResults] = useState<WorkoutResult[]>([]);
   const [currentSetReps, setCurrentSetReps] = useState(0);
@@ -147,7 +147,7 @@ export default function WorkoutSession({ preset, customRestTime, onFinish, onExi
           setSetIndex(0);
           setCurrentSetReps(0);
           setCurrentSetSeconds(0);
-          setPhase('exercise');
+          setPhase('exercise_intro');
         });
       }
     } else {
@@ -178,7 +178,7 @@ export default function WorkoutSession({ preset, customRestTime, onFinish, onExi
       setSetIndex(0);
       setCurrentSetReps(0);
       setCurrentSetSeconds(0);
-      setPhase('exercise');
+      setPhase('exercise_intro');
     }
   };
 
@@ -190,6 +190,52 @@ export default function WorkoutSession({ preset, customRestTime, onFinish, onExi
 
   const progressPercent = ((exerciseIndex * totalSets + setIndex) / (exerciseKeys.length * totalSets)) * 100;
 
+  // EXERCISE INTRO
+  if (phase === 'exercise_intro') {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, backgroundColor: '#333' }}>
+          <View style={{ width: `${progressPercent}%`, height: 4, backgroundColor: '#22c55e' }} />
+        </View>
+
+        <Text style={{ color: '#9ca3af', fontSize: 14, marginBottom: 8 }}>
+          Exercise {exerciseIndex + 1} of {exerciseKeys.length}
+          {setIndex > 0 ? ` · Set ${setIndex + 1} of ${totalSets}` : ''}
+        </Text>
+
+        <Text style={{ color: '#fff', fontSize: 30, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' }}>
+          {currentExercise.name}
+        </Text>
+
+        <Text style={{ color: '#9ca3af', fontSize: 15, textAlign: 'center', marginBottom: 8, paddingHorizontal: 16 }}>
+          {currentExercise.description}
+        </Text>
+
+        <Text style={{ color: '#6b7280', fontSize: 13, marginBottom: 32 }}>
+          {totalSets} sets × {target} {currentExercise.type === 'timed' ? 'seconds' : 'reps'}
+        </Text>
+
+        <View style={{ backgroundColor: 'rgba(234,179,8,0.15)', borderRadius: 8, padding: 12, paddingHorizontal: 20, marginBottom: 48 }}>
+          <Text style={{ color: '#facc15', fontSize: 14, textAlign: 'center' }}>
+            📱 {currentExercise.cameraPosition}
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={() => setPhase('exercise')}
+          style={{ backgroundColor: '#16a34a', paddingHorizontal: 56, paddingVertical: 18, borderRadius: 14, marginBottom: 16 }}
+        >
+          <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>Let's go →</Text>
+        </Pressable>
+
+        <Pressable onPress={onExit} style={{ paddingHorizontal: 40, paddingVertical: 12 }}>
+          <Text style={{ color: '#ef4444', fontSize: 14 }}>End Workout</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // REST
   if (phase === 'rest_between_sets' || phase === 'rest_between_exercises') {
     const isBetweenExercises = phase === 'rest_between_exercises';
     const nextKey = isBetweenExercises ? exerciseKeys[exerciseIndex + 1] : currentKey;
@@ -239,16 +285,14 @@ export default function WorkoutSession({ preset, customRestTime, onFinish, onExi
           <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Skip Rest →</Text>
         </Pressable>
 
-        <Pressable
-          onPress={onExit}
-          style={{ marginTop: 16, paddingHorizontal: 40, paddingVertical: 12 }}
-        >
+        <Pressable onPress={onExit} style={{ marginTop: 16, paddingHorizontal: 40, paddingVertical: 12 }}>
           <Text style={{ color: '#ef4444', fontSize: 14 }}>End Workout</Text>
         </Pressable>
       </View>
     );
   }
 
+  // EXERCISE
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <Camera
@@ -259,12 +303,10 @@ export default function WorkoutSession({ preset, customRestTime, onFinish, onExi
         workoutMode={true}
       />
 
-      {/* Progress bar */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 50 }}>
         <View style={{ width: `${progressPercent}%`, height: 4, backgroundColor: '#22c55e' }} />
       </View>
 
-      {/* Workout info overlay */}
       <View style={{
         position: 'absolute', top: 8, left: 0, right: 0,
         flexDirection: 'row', justifyContent: 'space-between',
@@ -292,7 +334,6 @@ export default function WorkoutSession({ preset, customRestTime, onFinish, onExi
         </View>
       </View>
 
-      {/* Butoane jos */}
       <View style={{
         position: 'absolute', bottom: 40, left: 16, right: 16,
         flexDirection: 'row', justifyContent: 'space-between', zIndex: 40,
