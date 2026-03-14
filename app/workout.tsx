@@ -67,8 +67,9 @@ export default function Workout() {
       setCustomWorkoutName('');
       setSelectedExercises([]);
       setScreen('menu');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save workout');
+    } catch (error: any) {
+      console.log('Save workout error:', error);
+      Alert.alert('Error', `Failed to save workout: ${error?.message || 'Unknown error'}`);
     }
   };
 
