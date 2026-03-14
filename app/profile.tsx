@@ -376,7 +376,8 @@ export default function Profile() {
             <View style={s.conditionNote}>
               <Ionicons name="medkit-outline" size={15} color={C.accent} />
               <Text style={s.conditionNoteText}>
-                Plan special {healthCondition ? `pentru ${healthCondition}` : "activ"}
+                Plan special{" "}
+                {healthCondition ? `pentru ${healthCondition}` : "activ"}
               </Text>
             </View>
           )}
@@ -427,32 +428,37 @@ export default function Profile() {
           {dailyFat !== undefined || dailyVitamins ? (
             <View style={s.specialNoteRow}>
               {dailyFat !== undefined && (
-                <Text style={s.specialNoteText}>Grăsimi țintă: {dailyFat} g</Text>
+                <Text style={s.specialNoteText}>
+                  Grăsimi țintă: {dailyFat} g
+                </Text>
               )}
               {dailyVitamins ? (
-                <Text style={s.specialNoteText}>Vitamine / note: {dailyVitamins}</Text>
+                <Text style={s.specialNoteText}>
+                  Vitamine / note: {dailyVitamins}
+                </Text>
               ) : null}
             </View>
           ) : null}
         </View>
 
-        {userData.hasHealthCondition && (healthCondition || dailyCarbs || dailyFat || dailyVitamins) && (
-          <View style={s.card}>
-            <SectionLabel label="Plan special" />
-            {healthCondition ? (
-              <Text style={s.specialLine}>Condiție: {healthCondition}</Text>
-            ) : null}
-            {dailyCarbs !== undefined && (
-              <Text style={s.specialLine}>Carbohidrați: {dailyCarbs} g</Text>
-            )}
-            {dailyFat !== undefined && (
-              <Text style={s.specialLine}>Grăsimi: {dailyFat} g</Text>
-            )}
-            {dailyVitamins ? (
-              <Text style={s.specialLine}>Vitamine: {dailyVitamins}</Text>
-            ) : null}
-          </View>
-        )}
+        {userData.hasHealthCondition &&
+          (healthCondition || dailyCarbs || dailyFat || dailyVitamins) && (
+            <View style={s.card}>
+              <SectionLabel label="Plan special" />
+              {healthCondition ? (
+                <Text style={s.specialLine}>Condiție: {healthCondition}</Text>
+              ) : null}
+              {dailyCarbs !== undefined && (
+                <Text style={s.specialLine}>Carbohidrați: {dailyCarbs} g</Text>
+              )}
+              {dailyFat !== undefined && (
+                <Text style={s.specialLine}>Grăsimi: {dailyFat} g</Text>
+              )}
+              {dailyVitamins ? (
+                <Text style={s.specialLine}>Vitamine: {dailyVitamins}</Text>
+              ) : null}
+            </View>
+          )}
 
         {/* Weight log */}
         <View style={s.card}>
@@ -799,5 +805,10 @@ const s = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
-  specialLine: { fontSize: 14, color: C.text, marginBottom: 6, fontWeight: "600" },
+  specialLine: {
+    fontSize: 14,
+    color: C.text,
+    marginBottom: 6,
+    fontWeight: "600",
+  },
 });

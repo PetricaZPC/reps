@@ -163,7 +163,11 @@ function ToggleRow({
   onToggle: () => void;
 }) {
   return (
-    <TouchableOpacity style={s.toggleRow} onPress={onToggle} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={s.toggleRow}
+      onPress={onToggle}
+      activeOpacity={0.8}
+    >
       <View style={[s.toggleDot, value && s.toggleDotOn]}>
         <View style={[s.toggleKnob, value && s.toggleKnobOn]} />
       </View>
@@ -420,7 +424,9 @@ export default function Settings() {
                   setUserData({
                     ...userData,
                     hasHealthCondition: next,
-                    healthConditionName: next ? userData.healthConditionName : "",
+                    healthConditionName: next
+                      ? userData.healthConditionName
+                      : "",
                   });
                 }}
               />
@@ -594,12 +600,20 @@ export default function Settings() {
                   <InfoRow
                     icon="leaf-outline"
                     label="Carbohidrați"
-                    value={userData.plan?.dailyCarbs ? `${userData.plan.dailyCarbs} g` : "—"}
+                    value={
+                      userData.plan?.dailyCarbs
+                        ? `${userData.plan.dailyCarbs} g`
+                        : "—"
+                    }
                   />
                   <InfoRow
                     icon="egg-outline"
                     label="Grăsimi"
-                    value={userData.plan?.dailyFat ? `${userData.plan.dailyFat} g` : "—"}
+                    value={
+                      userData.plan?.dailyFat
+                        ? `${userData.plan.dailyFat} g`
+                        : "—"
+                    }
                   />
                   <InfoRow
                     icon="heart-outline"
