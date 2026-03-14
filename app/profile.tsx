@@ -54,7 +54,11 @@ interface UserData {
   plan?: {
     dailyCalories: number;
     dailyProtein: number;
+    dailyCarbs?: number | string;
+    dailyFat?: number | string;
+    dailyVitamins?: string;
   };
+  hasHealthCondition?: boolean;
   progress?: ProgressEntry[];
   streak?: number;
   lastLogDate?: string;
@@ -109,6 +113,27 @@ export default function Profile() {
   const consumedCalories = passData((state) => state.calories) ?? 0;
   const consumedProtein = passData((state) => state.protein) ?? 0;
 
+  function hitDailyGoal(
+    goal: string | undefined,
+    targets: { calories: number; protein: number },
+  ) {
+    const g = goal?.toLowerCase() ?? "";
+    const cal = consumedCalories;
+    const prot = consumedProtein;
+    const calTarget = targets.calories;
+    const protTarget = targets.protein;
+    const protOk = prot >= protTarget * 0.9; // allow small margin on protein
+
+    if (g.includes("slab")) {
+      return cal >= calTarget - 200 && cal <= calTarget && protOk;
+    }
+    if (g.includes("masa")) {
+      return cal >= calTarget && cal <= calTarget + 400 && protOk;
+    }
+    // mentinere / default window
+    return cal >= calTarget - 200 && cal <= calTarget + 200 && protOk;
+  }
+
   useEffect(() => {
     loadUserData();
   }, []);
@@ -151,21 +176,42 @@ export default function Profile() {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yStr = yesterday.toISOString().split("T")[0];
+    const dailyTargets = {
+      calories: userData.plan?.dailyCalories ?? 2000,
+      protein: userData.plan?.dailyProtein ?? 150,
+    };
+    const hitGoal = hitDailyGoal(userData.goal, dailyTargets);
+
     let streak = userData.streak ?? 0;
-    if (userData.lastLogDate === yStr) {
-      streak += 1;
-    } else if (userData.lastLogDate !== TODAY) {
-      streak = 1;
+    if (hitGoal) {
+      if (userData.lastLogDate === yStr) {
+        streak += 1;
+      } else if (userData.lastLogDate !== TODAY) {
+        streak = 1;
+      }
+    } else {
+      // break the streak if goals are not met
+      streak = 0;
     }
 
     await updateDoc(doc(db, "users", user.uid), {
       progress,
       streak,
-      lastLogDate: TODAY,
+      lastLogDate: hitGoal ? TODAY : userData.lastLogDate,
     } as any);
 
-    setUserData({ ...userData, progress, streak, lastLogDate: TODAY });
-    Alert.alert("Greutate salvata!", `${w} kg inregistrat pentru azi.`);
+    setUserData({
+      ...userData,
+      progress,
+      streak,
+      lastLogDate: hitGoal ? TODAY : userData.lastLogDate,
+    });
+    Alert.alert(
+      hitGoal ? "Zi reusita!" : "Greutate salvata",
+      hitGoal
+        ? `${w} kg si obiective atinse pentru azi.`
+        : `${w} kg salvat, dar obiectivele zilnice nu au fost atinse (calorii/proteine).`,
+    );
   };
 
   if (!userData) {
@@ -200,6 +246,13 @@ export default function Profile() {
 
   const dailyCalories = userData.plan?.dailyCalories ?? 2000;
   const dailyProtein = userData.plan?.dailyProtein ?? 150;
+  const dailyCarbs = userData.plan?.dailyCarbs
+    ? Number(userData.plan.dailyCarbs)
+    : undefined;
+  const dailyFat = userData.plan?.dailyFat
+    ? Number(userData.plan.dailyFat)
+    : undefined;
+  const dailyVitamins = userData.plan?.dailyVitamins;
 
   const todayEntry = progress.find((p) => p.date === TODAY);
 
@@ -344,6 +397,21 @@ export default function Profile() {
             </View>
           </View>
         </View>
+
+        {userData.hasHealthCondition && (dailyCarbs || dailyFat || dailyVitamins) && (
+          <View style={s.card}>
+            <SectionLabel label="Plan special" />
+            {dailyCarbs !== undefined && (
+              <Text style={s.specialLine}>Carbohidrați: {dailyCarbs} g</Text>
+            )}
+            {dailyFat !== undefined && (
+              <Text style={s.specialLine}>Grăsimi: {dailyFat} g</Text>
+            )}
+            {dailyVitamins ? (
+              <Text style={s.specialLine}>Vitamine: {dailyVitamins}</Text>
+            ) : null}
+          </View>
+        )}
 
         {/* Weight log */}
         <View style={s.card}>
@@ -677,4 +745,5 @@ const s = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
+  specialLine: { fontSize: 14, color: C.text, marginBottom: 6, fontWeight: "600" },
 });
