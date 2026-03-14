@@ -35,7 +35,7 @@ export default function TabLayout() {
 
   return (
     <SafeAreaProvider>
-      <Tabs>
+      <Tabs initialRouteName="profile">
         <Tabs.Screen
           name="workout"
           options={{
@@ -59,6 +59,13 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
+            href: null,
+            headerShown: false,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
             title: "Profile",
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
@@ -70,16 +77,6 @@ export default function TabLayout() {
           name="settings"
           options={{
             title: "Settings",
-            headerShown: false,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="settings-outline" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            href: null,
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="settings-outline" size={size} color={color} />

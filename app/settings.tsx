@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Platform,
-  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -50,8 +49,14 @@ interface UserData {
 }
 
 const EMPTY: UserData = {
-  age: "", weight: "", height: "", sex: "",
-  targetWeight: "", activityLevel: "", goal: "", progress: [],
+  age: "",
+  weight: "",
+  height: "",
+  sex: "",
+  targetWeight: "",
+  activityLevel: "",
+  goal: "",
+  progress: [],
 };
 
 // ─── Sub-components ─────────────────────────────────────────
@@ -91,7 +96,15 @@ function Field({
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: any;
+  label: string;
+  value: string;
+}) {
   return (
     <View style={s.infoRow}>
       <View style={s.infoIcon}>
@@ -121,15 +134,23 @@ function ActionRow({
   danger?: boolean;
 }) {
   return (
-    <TouchableOpacity style={s.actionRow} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity
+      style={s.actionRow}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
       <View style={[s.actionIcon, { backgroundColor: bgColor }]}>
         <Ionicons name={icon} size={16} color={color} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[s.actionLabel, danger && { color: C.danger }]}>{label}</Text>
+        <Text style={[s.actionLabel, danger && { color: C.danger }]}>
+          {label}
+        </Text>
         {sublabel && <Text style={s.actionSublabel}>{sublabel}</Text>}
       </View>
-      {!danger && <Ionicons name="chevron-forward" size={16} color={C.textLight} />}
+      {!danger && (
+        <Ionicons name="chevron-forward" size={16} color={C.textLight} />
+      )}
     </TouchableOpacity>
   );
 }
@@ -149,7 +170,10 @@ export default function Settings() {
   const loadUserData = async () => {
     try {
       const user = auth.currentUser;
-      if (!user) { setUserData(EMPTY); return; }
+      if (!user) {
+        setUserData(EMPTY);
+        return;
+      }
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
@@ -167,7 +191,9 @@ export default function Settings() {
     const user = auth.currentUser;
     if (!user || !userData) return;
     try {
-      await setDoc(doc(db, "users", user.uid), userData as any, { merge: true });
+      await setDoc(doc(db, "users", user.uid), userData as any, {
+        merge: true,
+      });
       setEditing(false);
       Alert.alert("Salvat!", "Datele personale au fost actualizate.");
     } catch {
@@ -188,7 +214,7 @@ export default function Settings() {
       if (error?.code === "auth/requires-recent-login") {
         Alert.alert(
           "Reautentificare necesară",
-          "Pentru a schimba email-ul, fă logout și autentifică-te din nou."
+          "Pentru a schimba email-ul, fă logout și autentifică-te din nou.",
         );
       } else {
         Alert.alert("Eroare", "Nu am putut actualiza email-ul.");
@@ -198,7 +224,10 @@ export default function Settings() {
 
   const onResetPassword = async () => {
     const email = auth.currentUser?.email;
-    if (!email) { Alert.alert("Eroare", "Nu există email asociat contului."); return; }
+    if (!email) {
+      Alert.alert("Eroare", "Nu există email asociat contului.");
+      return;
+    }
     Alert.alert(
       "Resetează parola",
       `Trimitem un email de resetare la ${email}.`,
@@ -215,13 +244,15 @@ export default function Settings() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
   if (!userData) {
     return (
-      <View style={[s.root, { alignItems: "center", justifyContent: "center" }]}>
+      <View
+        style={[s.root, { alignItems: "center", justifyContent: "center" }]}
+      >
         <Text style={{ color: C.textMuted }}>Se încarcă...</Text>
       </View>
     );
@@ -232,8 +263,21 @@ export default function Settings() {
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
       {/* Blobs */}
-      <View style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]} />
-      <View style={[s.blob, { bottom: 200, left: -100, width: 240, height: 240, backgroundColor: C.blob2 }]} />
+      <View
+        style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]}
+      />
+      <View
+        style={[
+          s.blob,
+          {
+            bottom: 200,
+            left: -100,
+            width: 240,
+            height: 240,
+            backgroundColor: C.blob2,
+          },
+        ]}
+      />
 
       <ScrollView
         style={{ flex: 1 }}
@@ -262,18 +306,28 @@ export default function Settings() {
                   onPress={() => setEditing(false)}
                   style={[s.editBtn, { borderColor: C.textLight }]}
                 >
-                  <Text style={[s.editBtnText, { color: C.textMuted }]}>Anulează</Text>
+                  <Text style={[s.editBtnText, { color: C.textMuted }]}>
+                    Anulează
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={saveData}
-                  style={[s.editBtn, { backgroundColor: C.accent, borderColor: C.accent }]}
+                  style={[
+                    s.editBtn,
+                    { backgroundColor: C.accent, borderColor: C.accent },
+                  ]}
                 >
                   <Ionicons name="checkmark" size={13} color="#fff" />
-                  <Text style={[s.editBtnText, { color: "#fff" }]}>Salvează</Text>
+                  <Text style={[s.editBtnText, { color: "#fff" }]}>
+                    Salvează
+                  </Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity onPress={() => setEditing(true)} style={s.editBtn}>
+              <TouchableOpacity
+                onPress={() => setEditing(true)}
+                style={s.editBtn}
+              >
                 <Ionicons name="pencil" size={13} color={C.accent} />
                 <Text style={s.editBtnText}>Editează</Text>
               </TouchableOpacity>
@@ -284,33 +338,102 @@ export default function Settings() {
             <>
               <View style={s.fieldRow}>
                 <View style={{ flex: 1 }}>
-                  <Field label="Vârstă" value={userData.age} onChangeText={(v) => setUserData({ ...userData, age: v })} keyboard="numeric" />
+                  <Field
+                    label="Vârstă"
+                    value={userData.age}
+                    onChangeText={(v) => setUserData({ ...userData, age: v })}
+                    keyboard="numeric"
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Field label="Sex" value={userData.sex} onChangeText={(v) => setUserData({ ...userData, sex: v })} placeholder="M / F" />
+                  <Field
+                    label="Sex"
+                    value={userData.sex}
+                    onChangeText={(v) => setUserData({ ...userData, sex: v })}
+                    placeholder="M / F"
+                  />
                 </View>
               </View>
               <View style={s.fieldRow}>
                 <View style={{ flex: 1 }}>
-                  <Field label="Greutate (kg)" value={userData.weight} onChangeText={(v) => setUserData({ ...userData, weight: v })} keyboard="numeric" />
+                  <Field
+                    label="Greutate (kg)"
+                    value={userData.weight}
+                    onChangeText={(v) =>
+                      setUserData({ ...userData, weight: v })
+                    }
+                    keyboard="numeric"
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Field label="Înălțime (cm)" value={userData.height} onChangeText={(v) => setUserData({ ...userData, height: v })} keyboard="numeric" />
+                  <Field
+                    label="Înălțime (cm)"
+                    value={userData.height}
+                    onChangeText={(v) =>
+                      setUserData({ ...userData, height: v })
+                    }
+                    keyboard="numeric"
+                  />
                 </View>
               </View>
-              <Field label="Greutate țintă (kg)" value={userData.targetWeight} onChangeText={(v) => setUserData({ ...userData, targetWeight: v })} keyboard="numeric" />
-              <Field label="Nivel activitate" value={userData.activityLevel} onChangeText={(v) => setUserData({ ...userData, activityLevel: v })} placeholder="sedentar / moderat / activ" />
-              <Field label="Obiectiv" value={userData.goal} onChangeText={(v) => setUserData({ ...userData, goal: v })} placeholder="slăbire / menținere / masă musculară" />
+              <Field
+                label="Greutate țintă (kg)"
+                value={userData.targetWeight}
+                onChangeText={(v) =>
+                  setUserData({ ...userData, targetWeight: v })
+                }
+                keyboard="numeric"
+              />
+              <Field
+                label="Nivel activitate"
+                value={userData.activityLevel}
+                onChangeText={(v) =>
+                  setUserData({ ...userData, activityLevel: v })
+                }
+                placeholder="sedentar / moderat / activ"
+              />
+              <Field
+                label="Obiectiv"
+                value={userData.goal}
+                onChangeText={(v) => setUserData({ ...userData, goal: v })}
+                placeholder="slăbire / menținere / masă musculară"
+              />
             </>
           ) : (
             <>
-              <InfoRow icon="calendar-outline" label="Vârstă" value={userData.age ? `${userData.age} ani` : ""} />
-              <InfoRow icon="scale-outline" label="Greutate" value={userData.weight ? `${userData.weight} kg` : ""} />
-              <InfoRow icon="resize-outline" label="Înălțime" value={userData.height ? `${userData.height} cm` : ""} />
+              <InfoRow
+                icon="calendar-outline"
+                label="Vârstă"
+                value={userData.age ? `${userData.age} ani` : ""}
+              />
+              <InfoRow
+                icon="scale-outline"
+                label="Greutate"
+                value={userData.weight ? `${userData.weight} kg` : ""}
+              />
+              <InfoRow
+                icon="resize-outline"
+                label="Înălțime"
+                value={userData.height ? `${userData.height} cm` : ""}
+              />
               <InfoRow icon="person-outline" label="Sex" value={userData.sex} />
-              <InfoRow icon="flag-outline" label="Greutate țintă" value={userData.targetWeight ? `${userData.targetWeight} kg` : ""} />
-              <InfoRow icon="flash-outline" label="Activitate" value={userData.activityLevel} />
-              <InfoRow icon="trophy-outline" label="Obiectiv" value={userData.goal} />
+              <InfoRow
+                icon="flag-outline"
+                label="Greutate țintă"
+                value={
+                  userData.targetWeight ? `${userData.targetWeight} kg` : ""
+                }
+              />
+              <InfoRow
+                icon="flash-outline"
+                label="Activitate"
+                value={userData.activityLevel}
+              />
+              <InfoRow
+                icon="trophy-outline"
+                label="Obiectiv"
+                value={userData.goal}
+              />
             </>
           )}
         </View>
@@ -323,7 +446,11 @@ export default function Settings() {
             <Text style={s.fieldLabel}>Adresă de email</Text>
             <View style={s.emailRow}>
               <TextInput
-                style={[s.input, { flex: 1, marginBottom: 0 }, emailFocused && s.inputFocused]}
+                style={[
+                  s.input,
+                  { flex: 1, marginBottom: 0 },
+                  emailFocused && s.inputFocused,
+                ]}
                 value={newEmail}
                 onChangeText={setNewEmail}
                 onFocus={() => setEmailFocused(true)}
@@ -368,7 +495,11 @@ export default function Settings() {
             onPress={() =>
               Alert.alert("Ești sigur?", "Vei fi deconectat din cont.", [
                 { text: "Anulează", style: "cancel" },
-                { text: "Logout", style: "destructive", onPress: () => auth.signOut() },
+                {
+                  text: "Logout",
+                  style: "destructive",
+                  onPress: () => auth.signOut(),
+                },
               ])
             }
             color={C.danger}
@@ -435,10 +566,10 @@ const s = StyleSheet.create({
 
   // Card
   card: {
-    backgroundColor: C.glass,
+    backgroundColor: C.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.glassBorder,
+    borderColor: C.border,
     padding: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -529,7 +660,7 @@ const s = StyleSheet.create({
     marginTop: 6,
   },
   input: {
-    backgroundColor: C.bg,
+    backgroundColor: "transparent",
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: C.border,

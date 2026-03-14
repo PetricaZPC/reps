@@ -6,17 +6,17 @@ import { doc, setDoc } from "firebase/firestore";
 import { useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  KeyboardAvoidingView,
-  Platform,
-  StatusBar,
-  StyleSheet,
 } from "react-native";
 import Svg, { Rect, Text as SvgText } from "react-native-svg";
 import { Gemini } from "../src/useGemini";
@@ -119,7 +119,10 @@ export default function SignIn() {
       const prompt = `Bazat pe datele utilizatorului: vârstă ${userData.age}, greutate ${userData.weight}kg, înălțime ${userData.height}cm, sex ${userData.sex}, greutate țintă ${userData.targetWeight}kg, nivel activitate ${userData.activityLevel}, obiectiv ${userData.goal}. Generează un plan zilnic de nutriție: calorii, proteine, carbohidrați, grăsimi, apă. Returnează JSON cu: dailyCalories, dailyProtein, dailyCarbs, dailyFat, dailyWater.`;
       const response = await Gemini(prompt);
       const plan = JSON.parse(
-        response.replace(/```json/g, "").replace(/```/g, "").trim()
+        response
+          .replace(/```json/g, "")
+          .replace(/```/g, "")
+          .trim(),
       );
       const user = auth.currentUser;
       if (user) {
@@ -157,8 +160,21 @@ export default function SignIn() {
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
       {/* Decorative blobs */}
-      <View style={[s.blob, { top: -80, left: -60, backgroundColor: C.blob1 }]} />
-      <View style={[s.blob, { top: 140, right: -100, width: 280, height: 280, backgroundColor: C.blob2 }]} />
+      <View
+        style={[s.blob, { top: -80, left: -60, backgroundColor: C.blob1 }]}
+      />
+      <View
+        style={[
+          s.blob,
+          {
+            top: 140,
+            right: -100,
+            width: 280,
+            height: 280,
+            backgroundColor: C.blob2,
+          },
+        ]}
+      />
 
       <ScrollView
         contentContainerStyle={s.scroll}
@@ -192,7 +208,11 @@ export default function SignIn() {
             onChangeText={setPassword}
             secure
           />
-          <TouchableOpacity style={s.btn} onPress={handleAuth} activeOpacity={0.88}>
+          <TouchableOpacity
+            style={s.btn}
+            onPress={handleAuth}
+            activeOpacity={0.88}
+          >
             <Text style={s.btnText}>
               {isLogin ? "Intră în cont" : "Creează cont"}
             </Text>
@@ -200,7 +220,10 @@ export default function SignIn() {
         </View>
 
         {/* Toggle */}
-        <TouchableOpacity style={s.toggleWrap} onPress={() => setIsLogin(!isLogin)}>
+        <TouchableOpacity
+          style={s.toggleWrap}
+          onPress={() => setIsLogin(!isLogin)}
+        >
           <Text style={s.toggleText}>
             {isLogin ? "Nu ai cont? " : "Ai deja cont? "}
             <Text style={s.toggleAccent}>
@@ -225,7 +248,8 @@ export default function SignIn() {
               <Svg width={20} height={20} viewBox="0 0 64 64">
                 <Rect width={64} height={64} rx={16} fill="#0F0F10" />
                 <SvgText
-                  x={32} y={32}
+                  x={32}
+                  y={32}
                   fill="white"
                   fontSize={20}
                   fontWeight="900"
@@ -240,7 +264,9 @@ export default function SignIn() {
             </View>
             <View>
               <Text style={s.modalTitle}>Completează profilul</Text>
-              <Text style={s.modalSubtitle}>Îți construim planul personalizat</Text>
+              <Text style={s.modalSubtitle}>
+                Îți construim planul personalizat
+              </Text>
             </View>
           </View>
 
@@ -250,18 +276,53 @@ export default function SignIn() {
             showsVerticalScrollIndicator={false}
           >
             <SectionLabel label="Date personale" />
-            <Field placeholder="Vârsta (ani)" value={userData.age} onChangeText={set("age")} keyboard="numeric" />
-            <Field placeholder="Greutatea actuală (kg)" value={userData.weight} onChangeText={set("weight")} keyboard="numeric" />
-            <Field placeholder="Înălțimea (cm)" value={userData.height} onChangeText={set("height")} keyboard="numeric" />
-            <Field placeholder="Sex (M / F)" value={userData.sex} onChangeText={set("sex")} />
+            <Field
+              placeholder="Vârsta (ani)"
+              value={userData.age}
+              onChangeText={set("age")}
+              keyboard="numeric"
+            />
+            <Field
+              placeholder="Greutatea actuală (kg)"
+              value={userData.weight}
+              onChangeText={set("weight")}
+              keyboard="numeric"
+            />
+            <Field
+              placeholder="Înălțimea (cm)"
+              value={userData.height}
+              onChangeText={set("height")}
+              keyboard="numeric"
+            />
+            <Field
+              placeholder="Sex (M / F)"
+              value={userData.sex}
+              onChangeText={set("sex")}
+            />
 
             <SectionLabel label="Obiective" />
-            <Field placeholder="Greutatea țintă (kg)" value={userData.targetWeight} onChangeText={set("targetWeight")} keyboard="numeric" />
-            <Field placeholder="Nivel activitate  ·  sedentar / moderat / activ" value={userData.activityLevel} onChangeText={set("activityLevel")} />
-            <Field placeholder="Obiectiv  ·  slăbire / menținere / masă musculară" value={userData.goal} onChangeText={set("goal")} />
+            <Field
+              placeholder="Greutatea țintă (kg)"
+              value={userData.targetWeight}
+              onChangeText={set("targetWeight")}
+              keyboard="numeric"
+            />
+            <Field
+              placeholder="Nivel activitate  ·  sedentar / moderat / activ"
+              value={userData.activityLevel}
+              onChangeText={set("activityLevel")}
+            />
+            <Field
+              placeholder="Obiectiv  ·  slăbire / menținere / masă musculară"
+              value={userData.goal}
+              onChangeText={set("goal")}
+            />
 
             <Pressable
-              style={({ pressed }) => [s.btn, { marginTop: 28, opacity: pressed ? 0.82 : 1 }]}
+              style={({ pressed }) => [
+                s.btn,
+                { marginTop: 28, opacity: pressed ? 0.82 : 1 },
+              ]}
               onPress={submitQuestionnaire}
             >
               <Text style={s.btnText}>Generează planul nutrițional</Text>

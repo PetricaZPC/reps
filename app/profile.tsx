@@ -1,12 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
   Dimensions,
   Platform,
-  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -17,19 +15,18 @@ import {
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import { auth, db } from "../firebase/firebaseConfig";
+import { passData } from "../src/passData";
 
-// ─── Design tokens (same as SignIn / Assistant) ─────────────
+// Tokens
 const C = {
   bg: "#F7F8FA",
-  glass: "rgba(255,255,255,0.72)",
-  glassBorder: "rgba(255,255,255,0.9)",
   surface: "#FFFFFF",
   accent: "#4F6EF7",
   accentLight: "#EEF1FF",
   success: "#22C55E",
   successLight: "#DCFCE7",
-  danger: "#EF4444",
-  dangerLight: "#FEE2E2",
+  warning: "#F97316",
+  warningLight: "#FFF0E8",
   text: "#0F0F10",
   textMuted: "#8A8FA8",
   textLight: "#B8BCCD",
@@ -38,98 +35,79 @@ const C = {
   blob2: "#F0E8FF",
 };
 
-// ─── Types ──────────────────────────────────────────────────
+const TODAY = new Date().toISOString().split("T")[0];
+const screenWidth = Dimensions.get("window").width;
+
+// Types
+interface ProgressEntry {
+  date: string;
+  weight: number;
+  protein: number;
+}
+
 interface UserData {
-  age: string;
-  weight: string;
-  height: string;
-  sex: string;
-  targetWeight: string;
-  activityLevel: string;
-  goal: string;
+  weight?: string;
+  targetWeight?: string;
+  height?: string;
+  activityLevel?: string;
+  goal?: string;
   plan?: {
     dailyCalories: number;
     dailyProtein: number;
-    dailyCarbs: number;
-    dailyFat: number;
-    dailyWater: number;
   };
-  progress?: { date: string; weight: number; protein: number }[];
+  progress?: ProgressEntry[];
+  streak?: number;
+  lastLogDate?: string;
 }
 
-// ─── Helpers ────────────────────────────────────────────────
+// Helpers
 function SectionLabel({ label }: { label: string }) {
   return <Text style={s.sectionLabel}>{label}</Text>;
 }
 
-function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
-  return (
-    <View style={s.infoRow}>
-      <View style={s.infoIcon}>
-        <Ionicons name={icon} size={15} color={C.accent} />
-      </View>
-      <Text style={s.infoLabel}>{label}</Text>
-      <Text style={s.infoValue}>{value}</Text>
-    </View>
-  );
-}
-
-function MacroCard({
+function MacroBar({
   label,
   value,
-  unit,
+  target,
   color,
+  unit,
 }: {
   label: string;
-  value: string | number;
-  unit: string;
+  value: number;
+  target: number;
   color: string;
+  unit: string;
 }) {
+  const pct = Math.min(value / target, 1) * 100;
   return (
-    <View style={[s.macroCard, { borderTopColor: color, borderTopWidth: 3 }]}>
-      <Text style={[s.macroValue, { color }]}>{value}</Text>
-      <Text style={s.macroUnit}>{unit}</Text>
-      <Text style={s.macroLabel}>{label}</Text>
+    <View style={s.macroBarWrap}>
+      <View style={s.macroBarHeader}>
+        <Text style={s.macroBarLabel}>{label}</Text>
+        <Text style={s.macroBarValue}>
+          <Text style={{ color, fontWeight: "700" }}>{value}</Text>
+          <Text style={{ color: C.textMuted }}>
+            {" "}
+            / {target} {unit}
+          </Text>
+        </Text>
+      </View>
+      <View style={s.macroBarTrack}>
+        <View
+          style={[s.macroBarFill, { width: `${pct}%`, backgroundColor: color }]}
+        />
+      </View>
     </View>
   );
 }
 
-function Field({
-  label,
-  value,
-  onChangeText,
-  keyboard,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  keyboard?: any;
-}) {
-  const [focused, setFocused] = useState(false);
-  return (
-    <View style={s.fieldWrap}>
-      <Text style={s.fieldLabel}>{label}</Text>
-      <TextInput
-        style={[s.input, focused && s.inputFocused]}
-        value={value}
-        onChangeText={onChangeText}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        keyboardType={keyboard}
-        autoCapitalize="none"
-        placeholderTextColor={C.textLight}
-      />
-    </View>
-  );
-}
-
-// ─── Main ───────────────────────────────────────────────────
+// Main
 export default function Profile() {
-  const navigation = useNavigation();
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [newProgress, setNewProgress] = useState({ weight: "", protein: "" });
-  const [activeChart, setActiveChart] = useState<"weight" | "protein">("weight");
+  const [todayWeight, setTodayWeight] = useState("");
+  const [weightFocused, setWeightFocused] = useState(false);
+
+  const consumedCalories = passData((state) => state.calories) ?? 0;
+  const consumedProtein = passData((state) => state.protein) ?? 0;
 
   useEffect(() => {
     loadUserData();
@@ -137,90 +115,120 @@ export default function Profile() {
 
   const loadUserData = async () => {
     const user = auth.currentUser;
-    if (user) {
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) setUserData(docSnap.data() as UserData);
+    if (!user) return;
+    const snap = await getDoc(doc(db, "users", user.uid));
+    if (snap.exists()) {
+      const data = snap.data() as UserData;
+      setUserData(data);
+      const todayEntry = (data.progress ?? []).find((p) => p.date === TODAY);
+      if (todayEntry) setTodayWeight(String(todayEntry.weight));
     }
   };
 
-  const saveData = async () => {
-    const user = auth.currentUser;
-    if (user && userData) {
-      await updateDoc(doc(db, "users", user.uid), userData as any);
-      setEditing(false);
-      Alert.alert("Salvat!", "Datele tale au fost actualizate.");
-    }
-  };
-
-  const addProgress = async () => {
-    const user = auth.currentUser;
-    if (!newProgress.weight || !newProgress.protein) {
-      Alert.alert("Completează ambele câmpuri.");
+  const logWeight = async () => {
+    const w = parseFloat(todayWeight);
+    if (isNaN(w) || w <= 0) {
+      Alert.alert("Eroare", "Introdu o greutate valida.");
       return;
     }
-    if (user && userData) {
-      const progress = userData.progress || [];
-      progress.push({
-        date: new Date().toLocaleDateString("ro-RO", { day: "2-digit", month: "short" }),
-        weight: parseFloat(newProgress.weight),
-        protein: parseFloat(newProgress.protein),
-      });
-      await updateDoc(doc(db, "users", user.uid), { progress } as any);
-      setUserData({ ...userData, progress });
-      setNewProgress({ weight: "", protein: "" });
-      Alert.alert("Progres adăugat!");
+    const user = auth.currentUser;
+    if (!user || !userData) return;
+
+    const progress = [...(userData.progress ?? [])];
+    const existingIdx = progress.findIndex((p) => p.date === TODAY);
+    const entry: ProgressEntry = {
+      date: TODAY,
+      weight: w,
+      protein: consumedProtein,
+    };
+
+    if (existingIdx >= 0) {
+      progress[existingIdx] = entry;
+    } else {
+      progress.push(entry);
     }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yStr = yesterday.toISOString().split("T")[0];
+    let streak = userData.streak ?? 0;
+    if (userData.lastLogDate === yStr) {
+      streak += 1;
+    } else if (userData.lastLogDate !== TODAY) {
+      streak = 1;
+    }
+
+    await updateDoc(doc(db, "users", user.uid), {
+      progress,
+      streak,
+      lastLogDate: TODAY,
+    } as any);
+
+    setUserData({ ...userData, progress, streak, lastLogDate: TODAY });
+    Alert.alert("Greutate salvata!", `${w} kg inregistrat pentru azi.`);
   };
 
   if (!userData) {
     return (
-      <View style={[s.root, { alignItems: "center", justifyContent: "center" }]}>
-        <Text style={{ color: C.textMuted, fontSize: 15 }}>Se încarcă...</Text>
+      <View
+        style={[s.root, { alignItems: "center", justifyContent: "center" }]}
+      >
+        <Text style={{ color: C.textMuted }}>Se incarca...</Text>
       </View>
     );
   }
 
-  const screenWidth = Dimensions.get("window").width;
-  const progressData = userData.progress || [];
-  const chartLabels = progressData.map((p) => p.date);
-  const weightData = progressData.length > 0 ? progressData.map((p) => p.weight) : [0];
-  const proteinData = progressData.length > 0 ? progressData.map((p) => p.protein) : [0];
+  const progress = userData.progress ?? [];
+  const streak = userData.streak ?? 0;
 
-  const chartConfig = (color: string) => ({
-    backgroundColor: C.surface,
-    backgroundGradientFrom: C.surface,
-    backgroundGradientTo: C.surface,
-    decimalPlaces: 1,
-    color: (opacity = 1) => color.replace("1)", `${opacity})`),
-    labelColor: () => C.textMuted,
-    propsForDots: { r: "4", strokeWidth: "2", stroke: color.replace(", 1)", ", 1)") },
-    propsForBackgroundLines: { stroke: C.border, strokeWidth: 0.5 },
-  });
+  const latestWeight =
+    (progress.length > 0 ? progress[progress.length - 1].weight : undefined) ??
+    (userData.weight ? parseFloat(userData.weight) : undefined);
+  const targetWeight = userData.targetWeight
+    ? parseFloat(userData.targetWeight)
+    : undefined;
+  const heightCm = userData.height ? parseFloat(userData.height) : undefined;
+  const bmi =
+    latestWeight && heightCm
+      ? (latestWeight / Math.pow(heightCm / 100, 2)).toFixed(1)
+      : undefined;
 
-  // BMI calculation
-  const bmi = userData.weight && userData.height
-    ? (parseFloat(userData.weight) / Math.pow(parseFloat(userData.height) / 100, 2)).toFixed(1)
-    : null;
+  const recent = [...progress].slice(-7);
+  const chartLabels = recent.map((p) => p.date.slice(5));
+  const weightData = recent.map((p) => p.weight);
+  const hasChartData = recent.length >= 2;
 
-  const weightToGoal = userData.weight && userData.targetWeight
-    ? (parseFloat(userData.weight) - parseFloat(userData.targetWeight)).toFixed(1)
-    : null;
+  const dailyCalories = userData.plan?.dailyCalories ?? 2000;
+  const dailyProtein = userData.plan?.dailyProtein ?? 150;
+
+  const todayEntry = progress.find((p) => p.date === TODAY);
 
   return (
     <View style={s.root}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
-      {/* Blobs */}
-      <View style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]} />
-      <View style={[s.blob, { bottom: 200, left: -100, width: 240, height: 240, backgroundColor: C.blob2 }]} />
+      <View
+        style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]}
+      />
+      <View
+        style={[
+          s.blob,
+          {
+            bottom: 200,
+            left: -100,
+            width: 240,
+            height: 240,
+            backgroundColor: C.blob2,
+          },
+        ]}
+      />
 
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header ── */}
+        {/* Header */}
         <View style={s.header}>
           <View style={s.avatarWrap}>
             <Text style={s.avatarInitial}>
@@ -231,190 +239,221 @@ export default function Profile() {
             <Text style={s.headerName}>
               {auth.currentUser?.email?.split("@")[0] ?? "Utilizator"}
             </Text>
-            <Text style={s.headerEmail}>{auth.currentUser?.email}</Text>
+            <Text style={s.headerSub}>Progresul tau de azi</Text>
           </View>
-          {bmi && (
-            <View style={s.bmiBadge}>
-              <Text style={s.bmiLabel}>BMI</Text>
-              <Text style={s.bmiValue}>{bmi}</Text>
-            </View>
-          )}
         </View>
 
-        {/* ── Quick stats ── */}
-        {weightToGoal && (
-          <View style={[s.card, s.goalBanner]}>
-            <Ionicons name="flag" size={16} color={C.accent} />
-            <Text style={s.goalText}>
-              {parseFloat(weightToGoal) > 0
-                ? `Mai ai ${weightToGoal} kg până la obiectiv`
-                : parseFloat(weightToGoal) < 0
-                ? `Ai depășit obiectivul cu ${Math.abs(parseFloat(weightToGoal))} kg`
-                : "Ai atins obiectivul! 🎉"}
-            </Text>
-          </View>
-        )}
-
-        {/* ── Personal info ── */}
+        {/* Streak */}
         <View style={s.card}>
-          <View style={s.cardHeader}>
-            <SectionLabel label="Date personale" />
-            <TouchableOpacity
-              onPress={() => (editing ? saveData() : setEditing(true))}
-              style={[s.editBtn, editing && { backgroundColor: C.accent }]}
-            >
-              <Ionicons
-                name={editing ? "checkmark" : "pencil"}
-                size={14}
-                color={editing ? "#fff" : C.accent}
-              />
-              <Text style={[s.editBtnText, editing && { color: "#fff" }]}>
-                {editing ? "Salvează" : "Editează"}
+          <View style={s.streakRow}>
+            <View style={s.streakFlame}>
+              <Ionicons name="flame" size={22} color="#F97316" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.streakCount}>
+                {streak} {streak === 1 ? "zi" : "zile"} la rand
               </Text>
-            </TouchableOpacity>
-          </View>
-
-          {editing ? (
-            <>
-              <Field label="Vârstă" value={userData.age} onChangeText={(v) => setUserData({ ...userData, age: v })} keyboard="numeric" />
-              <Field label="Greutate (kg)" value={userData.weight} onChangeText={(v) => setUserData({ ...userData, weight: v })} keyboard="numeric" />
-              <Field label="Înălțime (cm)" value={userData.height} onChangeText={(v) => setUserData({ ...userData, height: v })} keyboard="numeric" />
-              <Field label="Sex" value={userData.sex} onChangeText={(v) => setUserData({ ...userData, sex: v })} />
-              <Field label="Greutate țintă (kg)" value={userData.targetWeight} onChangeText={(v) => setUserData({ ...userData, targetWeight: v })} keyboard="numeric" />
-              <Field label="Nivel activitate" value={userData.activityLevel} onChangeText={(v) => setUserData({ ...userData, activityLevel: v })} />
-              <Field label="Obiectiv" value={userData.goal} onChangeText={(v) => setUserData({ ...userData, goal: v })} />
-            </>
-          ) : (
-            <>
-              <InfoRow icon="calendar-outline" label="Vârstă" value={`${userData.age} ani`} />
-              <InfoRow icon="scale-outline" label="Greutate" value={`${userData.weight} kg`} />
-              <InfoRow icon="resize-outline" label="Înălțime" value={`${userData.height} cm`} />
-              <InfoRow icon="person-outline" label="Sex" value={userData.sex} />
-              <InfoRow icon="flag-outline" label="Greutate țintă" value={`${userData.targetWeight} kg`} />
-              <InfoRow icon="flash-outline" label="Activitate" value={userData.activityLevel} />
-              <InfoRow icon="trophy-outline" label="Obiectiv" value={userData.goal} />
-            </>
-          )}
-        </View>
-
-        {/* ── Daily plan ── */}
-        {userData.plan && (
-          <View style={s.card}>
-            <SectionLabel label="Plan zilnic" />
-            <View style={s.macroGrid}>
-              <MacroCard label="Calorii" value={userData.plan.dailyCalories} unit="kcal" color="#F97316" />
-              <MacroCard label="Proteine" value={`${userData.plan.dailyProtein}g`} unit="" color={C.accent} />
-              <MacroCard label="Carbs" value={`${userData.plan.dailyCarbs}g`} unit="" color="#A855F7" />
-              <MacroCard label="Grăsimi" value={`${userData.plan.dailyFat}g`} unit="" color="#EAB308" />
+              <Text style={s.streakSub}>
+                {streak === 0
+                  ? "Inregistreaza greutatea azi pentru a incepe streak-ul"
+                  : streak < 7
+                    ? "Continua, esti pe drumul cel bun!"
+                    : "Fenomenal, esti consistent!"}
+              </Text>
             </View>
-            <View style={s.waterRow}>
-              <Ionicons name="water-outline" size={16} color="#38BDF8" />
-              <Text style={s.waterText}>Apă zilnică: <Text style={{ color: "#38BDF8", fontWeight: "700" }}>{userData.plan.dailyWater} ml</Text></Text>
-            </View>
-          </View>
-        )}
-
-        {/* ── Add progress ── */}
-        <View style={s.card}>
-          <SectionLabel label="Adaugă progres" />
-          <View style={s.progressInputRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Greutate (kg)</Text>
-              <TextInput
-                style={s.input}
-                placeholder="0"
-                placeholderTextColor={C.textLight}
-                value={newProgress.weight}
-                onChangeText={(v) => setNewProgress({ ...newProgress, weight: v })}
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Proteine (g)</Text>
-              <TextInput
-                style={s.input}
-                placeholder="0"
-                placeholderTextColor={C.textLight}
-                value={newProgress.protein}
-                onChangeText={(v) => setNewProgress({ ...newProgress, protein: v })}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-          <TouchableOpacity style={[s.btn, { backgroundColor: C.success, shadowColor: C.success }]} onPress={addProgress} activeOpacity={0.88}>
-            <Ionicons name="add-circle-outline" size={18} color="#fff" />
-            <Text style={s.btnText}>Adaugă intrare</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Charts ── */}
-        {progressData.length > 0 && (
-          <View style={s.card}>
-            <SectionLabel label="Statistici" />
-
-            {/* Tab toggle */}
-            <View style={s.tabRow}>
-              <TouchableOpacity
-                style={[s.tab, activeChart === "weight" && s.tabActive]}
-                onPress={() => setActiveChart("weight")}
-              >
-                <Text style={[s.tabText, activeChart === "weight" && s.tabTextActive]}>Greutate</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.tab, activeChart === "protein" && s.tabActive]}
-                onPress={() => setActiveChart("protein")}
-              >
-                <Text style={[s.tabText, activeChart === "protein" && s.tabTextActive]}>Proteine</Text>
-              </TouchableOpacity>
-            </View>
-
-            <LineChart
-              data={{
-                labels: chartLabels.length > 5 ? chartLabels.slice(-5) : chartLabels,
-                datasets: [{ data: activeChart === "weight" ? (weightData.length > 5 ? weightData.slice(-5) : weightData) : (proteinData.length > 5 ? proteinData.slice(-5) : proteinData) }],
-              }}
-              width={screenWidth - 80}
-              height={180}
-              chartConfig={
-                activeChart === "weight"
-                  ? chartConfig("rgba(79, 110, 247, 1)")
-                  : chartConfig("rgba(34, 197, 94, 1)")
-              }
-              bezier
-              style={{ borderRadius: 16, marginTop: 8 }}
-              withInnerLines
-              withOuterLines={false}
-            />
-
-            {/* Last entry summary */}
-            {progressData.length > 0 && (
-              <View style={s.lastEntry}>
-                <Text style={s.lastEntryLabel}>Ultima înregistrare</Text>
-                <Text style={s.lastEntryValue}>
-                  {progressData[progressData.length - 1].date} · {progressData[progressData.length - 1].weight} kg · {progressData[progressData.length - 1].protein}g prot
-                </Text>
+            {streak >= 7 && (
+              <View style={s.streakBadge}>
+                <Ionicons name="trophy" size={16} color="#EAB308" />
               </View>
             )}
           </View>
-        )}
 
-        {/* ── Account ── */}
-        <View style={s.card}>
-          <SectionLabel label="Cont" />
-          <TouchableOpacity
-            style={[s.btn, { backgroundColor: C.dangerLight, shadowOpacity: 0 }]}
-            onPress={() =>
-              Alert.alert("Ești sigur?", "Vei fi deconectat.", [
-                { text: "Anulează", style: "cancel" },
-                { text: "Logout", style: "destructive", onPress: () => auth.signOut() },
-              ])
-            }
-            activeOpacity={0.88}
-          >
-            <Ionicons name="log-out-outline" size={18} color={C.danger} />
-            <Text style={[s.btnText, { color: C.danger }]}>Deconectează-te</Text>
-          </TouchableOpacity>
+          <View style={s.streakDots}>
+            {["L", "Ma", "Mi", "J", "V", "S", "D"].map((day, i) => {
+              const d = new Date();
+              d.setDate(d.getDate() - (6 - i));
+              const dStr = d.toISOString().split("T")[0];
+              const logged = progress.some((p) => p.date === dStr);
+              return (
+                <View key={i} style={s.streakDotWrap}>
+                  <View style={[s.streakDot, logged && s.streakDotActive]} />
+                  <Text style={s.streakDotLabel}>{day}</Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
+
+        {/* Snapshot */}
+        <View style={s.card}>
+          <SectionLabel label="Stare rapida" />
+          <View style={s.snapshotRow}>
+            <View style={s.snapshotItem}>
+              <Text style={s.snapshotLabel}>Greutate</Text>
+              <Text style={s.snapshotValue}>
+                {latestWeight ? `${latestWeight.toFixed(1)} kg` : "–"}
+              </Text>
+            </View>
+            <View style={s.snapshotItem}>
+              <Text style={s.snapshotLabel}>Tint03</Text>
+              <Text style={s.snapshotValue}>
+                {targetWeight ? `${targetWeight.toFixed(1)} kg` : "–"}
+              </Text>
+            </View>
+            <View style={s.snapshotItem}>
+              <Text style={s.snapshotLabel}>BMI</Text>
+              <Text style={s.snapshotValue}>{bmi ?? "–"}</Text>
+            </View>
+            <View style={s.snapshotItem}>
+              <Text style={s.snapshotLabel}>Obiectiv</Text>
+              <Text style={s.snapshotValue} numberOfLines={1}>
+                {userData.goal || "–"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Targets */}
+        <View style={s.card}>
+          <SectionLabel label="Target de azi" />
+          <MacroBar
+            label="Calorii"
+            value={consumedCalories}
+            target={dailyCalories}
+            color="#F97316"
+            unit="kcal"
+          />
+          <MacroBar
+            label="Proteine"
+            value={consumedProtein}
+            target={dailyProtein}
+            color={C.accent}
+            unit="g"
+          />
+
+          <View style={s.remainRow}>
+            <View style={[s.remainChip, { backgroundColor: "#FFF0E8" }]}>
+              <Text style={[s.remainChipText, { color: "#F97316" }]}>
+                {Math.max(dailyCalories - consumedCalories, 0)} kcal ramase
+              </Text>
+            </View>
+            <View style={[s.remainChip, { backgroundColor: C.accentLight }]}>
+              <Text style={[s.remainChipText, { color: C.accent }]}>
+                {Math.max(dailyProtein - consumedProtein, 0)}g proteina ramasa
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Weight log */}
+        <View style={s.card}>
+          <SectionLabel label="Greutate azi" />
+          <View style={s.weightRow}>
+            <TextInput
+              style={[s.weightInput, weightFocused && s.inputFocused]}
+              placeholder="ex. 78.5"
+              placeholderTextColor={C.textLight}
+              value={todayWeight}
+              onChangeText={setTodayWeight}
+              onFocus={() => setWeightFocused(true)}
+              onBlur={() => setWeightFocused(false)}
+              keyboardType="decimal-pad"
+            />
+            <Text style={s.weightUnit}>kg</Text>
+            <TouchableOpacity
+              style={s.logBtn}
+              onPress={logWeight}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark" size={18} color="#fff" />
+              <Text style={s.logBtnText}>
+                {todayEntry ? "Actualizeaza" : "Salveaza"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {todayEntry && (
+            <View style={s.todayLogged}>
+              <Ionicons name="checkmark-circle" size={15} color={C.success} />
+              <Text style={s.todayLoggedText}>
+                Inregistrat azi:{" "}
+                <Text style={{ fontWeight: "700", color: C.text }}>
+                  {todayEntry.weight} kg
+                </Text>
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Chart */}
+        {hasChartData ? (
+          <View style={s.card}>
+            <SectionLabel label="Evolutie greutate" />
+            <LineChart
+              data={{
+                labels: chartLabels,
+                datasets: [{ data: weightData }],
+              }}
+              width={screenWidth - 80}
+              height={180}
+              chartConfig={{
+                backgroundColor: "transparent",
+                backgroundGradientFrom: "#FFFFFF",
+                backgroundGradientTo: "#FFFFFF",
+                decimalPlaces: 1,
+                color: (opacity = 1) => `rgba(79, 110, 247, ${opacity})`,
+                labelColor: () => C.textMuted,
+                propsForDots: { r: "4", strokeWidth: "2", stroke: C.accent },
+                propsForBackgroundLines: { stroke: C.border, strokeWidth: 0.5 },
+              }}
+              bezier
+              style={{ borderRadius: 16, marginTop: 4 }}
+              withInnerLines
+              withOuterLines={false}
+            />
+            {weightData.length >= 2 &&
+              (() => {
+                const delta = (
+                  weightData[weightData.length - 1] - weightData[0]
+                ).toFixed(1);
+                const isDown = parseFloat(delta) < 0;
+                return (
+                  <View
+                    style={[
+                      s.deltaChip,
+                      {
+                        backgroundColor: isDown
+                          ? C.successLight
+                          : C.warningLight,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={isDown ? "trending-down" : "trending-up"}
+                      size={14}
+                      color={isDown ? C.success : C.warning}
+                    />
+                    <Text
+                      style={[
+                        s.deltaText,
+                        { color: isDown ? C.success : C.warning },
+                      ]}
+                    >
+                      {isDown ? "" : "+"}
+                      {delta} kg in ultimele {recent.length} inregistrari
+                    </Text>
+                  </View>
+                );
+              })()}
+          </View>
+        ) : (
+          <View style={[s.card, s.emptyChart]}>
+            <Ionicons name="stats-chart" size={28} color={C.text} />
+            <Text style={s.emptyChartTitle}>Prea putine date</Text>
+            <Text style={s.emptyChartSub}>
+              Inregistreaza greutatea cel putin 2 zile pentru a vedea graficul.
+            </Text>
+          </View>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -422,12 +461,9 @@ export default function Profile() {
   );
 }
 
-// ─── Styles ─────────────────────────────────────────────────
+// Styles
 const s = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
+  root: { flex: 1, backgroundColor: C.bg },
   blob: {
     position: "absolute",
     width: 280,
@@ -442,7 +478,6 @@ const s = StyleSheet.create({
     gap: 14,
   },
 
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -450,83 +485,35 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   avatarWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: C.accent,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarInitial: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#fff",
-  },
+  avatarInitial: { fontSize: 20, fontWeight: "700", color: "#fff" },
   headerName: {
     fontSize: 18,
     fontWeight: "700",
     color: C.text,
     letterSpacing: -0.4,
   },
-  headerEmail: {
-    fontSize: 12,
-    color: C.textMuted,
-    marginTop: 2,
-  },
-  bmiBadge: {
-    backgroundColor: C.accentLight,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignItems: "center",
-  },
-  bmiLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: C.accent,
-    letterSpacing: 1,
-  },
-  bmiValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: C.accent,
-  },
+  headerSub: { fontSize: 12, color: C.textMuted, marginTop: 2 },
 
-  // Goal banner
-  goalBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 14,
-  },
-  goalText: {
-    fontSize: 14,
-    color: C.text,
-    fontWeight: "500",
-    flex: 1,
-  },
-
-  // Card
   card: {
-    backgroundColor: C.glass,
+    backgroundColor: C.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.glassBorder,
-    padding: 20,
+    borderColor: C.border,
+    padding: 18,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 1,
   },
 
-  // Section label
   sectionLabel: {
     fontSize: 11,
     fontWeight: "700",
@@ -536,194 +523,158 @@ const s = StyleSheet.create({
     marginBottom: 14,
   },
 
-  // Edit button
-  editBtn: {
+  streakRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: C.accent,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    gap: 14,
+    marginBottom: 16,
   },
-  editBtnText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: C.accent,
-  },
-
-  // Info row
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  infoIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: C.accentLight,
+  streakFlame: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "#FFF0E8",
     alignItems: "center",
     justifyContent: "center",
   },
-  infoLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: C.textMuted,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: "600",
+  streakCount: {
+    fontSize: 20,
+    fontWeight: "700",
     color: C.text,
+    letterSpacing: -0.4,
   },
+  streakSub: { fontSize: 12, color: C.textMuted, marginTop: 3 },
+  streakBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FEF9C3",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  streakDots: { flexDirection: "row", justifyContent: "space-between" },
+  streakDotWrap: { alignItems: "center", gap: 5 },
+  streakDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: C.border,
+  },
+  streakDotActive: {
+    backgroundColor: "#FFF0E8",
+    borderColor: "#F97316",
+  },
+  streakDotLabel: { fontSize: 10, color: C.textMuted, fontWeight: "600" },
 
-  // Field
-  fieldWrap: {
-    marginBottom: 10,
+  snapshotRow: {
+    flexDirection: "row",
+    gap: 10,
   },
-  fieldLabel: {
+  snapshotItem: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: "transparent",
+  },
+  snapshotLabel: {
     fontSize: 11,
-    fontWeight: "600",
     color: C.textMuted,
-    letterSpacing: 0.5,
-    marginBottom: 5,
+    marginBottom: 6,
+    fontWeight: "600",
+    letterSpacing: 0.3,
   },
-  input: {
-    backgroundColor: C.bg,
+  snapshotValue: { fontSize: 15, fontWeight: "700", color: C.text },
+
+  macroBarWrap: { marginBottom: 14 },
+  macroBarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 7,
+  },
+  macroBarLabel: { fontSize: 13, fontWeight: "600", color: C.text },
+  macroBarValue: { fontSize: 13 },
+  macroBarTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#EEF1F7",
+    overflow: "hidden",
+  },
+  macroBarFill: { height: 8, borderRadius: 4 },
+  remainRow: { flexDirection: "row", gap: 8, marginTop: 4 },
+  remainChip: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+  remainChipText: { fontSize: 12, fontWeight: "600" },
+
+  weightRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  weightInput: {
+    flex: 1,
+    backgroundColor: "transparent",
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: C.border,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+    paddingVertical: 13,
+    fontSize: 18,
+    fontWeight: "700",
     color: C.text,
   },
-  inputFocused: {
-    borderColor: C.accent,
-    backgroundColor: C.accentLight,
+  inputFocused: { borderColor: C.accent, backgroundColor: C.accentLight },
+  weightUnit: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: C.textMuted,
+    marginRight: 4,
   },
-
-  // Macro grid
-  macroGrid: {
+  logBtn: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 12,
-  },
-  macroCard: {
-    flex: 1,
-    backgroundColor: C.bg,
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.accent,
     borderRadius: 12,
-    padding: 10,
-    alignItems: "center",
-  },
-  macroValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-  },
-  macroUnit: {
-    fontSize: 10,
-    color: C.textMuted,
-    marginTop: 1,
-  },
-  macroLabel: {
-    fontSize: 10,
-    color: C.textMuted,
-    marginTop: 4,
-    fontWeight: "500",
-  },
-  waterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#EFF9FF",
-    borderRadius: 10,
-    padding: 10,
-  },
-  waterText: {
-    fontSize: 13,
-    color: C.textMuted,
-  },
-
-  // Progress inputs
-  progressInputRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 14,
-  },
-
-  // Button
-  btn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderRadius: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     shadowColor: C.accent,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
     elevation: 4,
-    backgroundColor: C.accent,
   },
-  btnText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-
-  // Charts
-  tabRow: {
+  logBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  todayLogged: {
     flexDirection: "row",
-    backgroundColor: C.bg,
-    borderRadius: 10,
-    padding: 3,
-    marginBottom: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 7,
     alignItems: "center",
-    borderRadius: 8,
-  },
-  tabActive: {
-    backgroundColor: C.surface,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  tabText: {
-    fontSize: 13,
-    color: C.textMuted,
-    fontWeight: "500",
-  },
-  tabTextActive: {
-    color: C.text,
-    fontWeight: "700",
-  },
-  lastEntry: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: C.bg,
+    gap: 6,
+    marginTop: 10,
+    backgroundColor: C.successLight,
     borderRadius: 10,
+    padding: 10,
   },
-  lastEntryLabel: {
-    fontSize: 11,
-    color: C.textMuted,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-    marginBottom: 3,
+  todayLoggedText: { fontSize: 13, color: C.textMuted },
+
+  deltaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
   },
-  lastEntryValue: {
+  deltaText: { fontSize: 13, fontWeight: "600" },
+  emptyChart: { alignItems: "center", paddingVertical: 28, gap: 6 },
+  emptyChartTitle: { fontSize: 15, fontWeight: "700", color: C.text },
+  emptyChartSub: {
     fontSize: 13,
-    color: C.text,
-    fontWeight: "500",
+    color: C.textMuted,
+    textAlign: "center",
+    lineHeight: 20,
   },
 });
