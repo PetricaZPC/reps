@@ -3,6 +3,7 @@ import { sendPasswordResetEmail, updateEmail } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Platform,
   ScrollView,
@@ -14,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { auth, db } from "../firebase/firebaseConfig";
+import { Gemini } from "../src/useGemini";
 
 // ─── Design tokens ──────────────────────────────────────────
 const C = {
@@ -23,6 +25,8 @@ const C = {
   surface: "#FFFFFF",
   accent: "#4F6EF7",
   accentLight: "#EEF1FF",
+  success: "#22C55E",
+  successLight: "#DCFCE7",
   warning: "#F97316",
   warningLight: "#FFF0E8",
   danger: "#EF4444",
@@ -113,6 +117,115 @@ function getSuggestedSpecialPlan(condition: string) {
     dailyCarbs: 200,
     dailyFat: 70,
     dailyVitamins: "Multivitamine, Omega-3, Magneziu",
+  };
+}
+
+function calculatePersonalPlan(user: UserData) {
+  const age = Number(user.age);
+  const weight = Number(user.weight);
+  const height = Number(user.height);
+  const sex = (user.sex || "").toLowerCase();
+  const activity = (user.activityLevel || "").toLowerCase();
+  const goal = (user.goal || "").toLowerCase();
+
+  if (
+    !Number.isFinite(age) ||
+    !Number.isFinite(weight) ||
+    !Number.isFinite(height) ||
+    age <= 0 ||
+    weight <= 0 ||
+    height <= 0
+  ) {
+    return undefined;
+  }
+
+  const isFemale = sex.includes("f");
+  const bmr = isFemale
+    ? 10 * weight + 6.25 * height - 5 * age - 161
+    : 10 * weight + 6.25 * height - 5 * age + 5;
+
+  let activityFactor = 1.35;
+  if (activity.includes("sedent")) activityFactor = 1.2;
+  else if (activity.includes("activ") || activity.includes("intens"))
+    activityFactor = 1.6;
+  else if (activity.includes("moderat")) activityFactor = 1.45;
+
+  let dailyCalories = Math.round(bmr * activityFactor);
+  if (goal.includes("slab")) dailyCalories -= 350;
+  if (goal.includes("masa")) dailyCalories += 300;
+  dailyCalories = Math.max(dailyCalories, 1200);
+
+  const proteinPerKg = goal.includes("masa")
+    ? 2.0
+    : goal.includes("slab")
+      ? 1.9
+      : 1.6;
+  const dailyProtein = Math.max(Math.round(weight * proteinPerKg), 70);
+
+  const proteinCalories = dailyProtein * 4;
+  const fatGrams = Math.round((dailyCalories * 0.28) / 9);
+  const fatCalories = fatGrams * 9;
+  const carbsGrams = Math.max(
+    Math.round((dailyCalories - proteinCalories - fatCalories) / 4),
+    80,
+  );
+
+  return {
+    dailyCalories,
+    dailyProtein,
+    dailyCarbs: carbsGrams,
+    dailyFat: fatGrams,
+  };
+}
+
+async function calculatePlanWithAI(user: UserData) {
+  const prompt = `Ești nutriționist. Calculează ținte zilnice personalizate bazate pe:
+- vârstă: ${user.age}
+- greutate: ${user.weight} kg
+- înălțime: ${user.height} cm
+- sex: ${user.sex}
+- greutate țintă: ${user.targetWeight} kg
+- activitate: ${user.activityLevel}
+- obiectiv: ${user.goal}
+
+Răspunde DOAR cu JSON valid (fără markdown), schema:
+{
+  "dailyCalories": number,
+  "dailyProtein": number,
+  "dailyCarbs": number,
+  "dailyFat": number
+}`;
+
+  const response = await Gemini(prompt);
+  const cleaned = response
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+  const parsed = JSON.parse(cleaned);
+
+  const dailyCalories = Number(parsed?.dailyCalories);
+  const dailyProtein = Number(parsed?.dailyProtein);
+  const dailyCarbs = Number(parsed?.dailyCarbs);
+  const dailyFat = Number(parsed?.dailyFat);
+
+  if (
+    !Number.isFinite(dailyCalories) ||
+    !Number.isFinite(dailyProtein) ||
+    !Number.isFinite(dailyCarbs) ||
+    !Number.isFinite(dailyFat) ||
+    dailyCalories <= 0 ||
+    dailyProtein <= 0 ||
+    dailyCarbs <= 0 ||
+    dailyFat <= 0
+  ) {
+    throw new Error("AI plan invalid");
+  }
+
+  return {
+    dailyCalories: Math.round(dailyCalories),
+    dailyProtein: Math.round(dailyProtein),
+    dailyCarbs: Math.round(dailyCarbs),
+    dailyFat: Math.round(dailyFat),
   };
 }
 
@@ -239,6 +352,11 @@ function ActionRow({
 export default function Settings() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [editing, setEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [emailFocused, setEmailFocused] = useState(false);
 
@@ -269,15 +387,49 @@ export default function Settings() {
 
   const saveData = async () => {
     const user = auth.currentUser;
-    if (!user || !userData) return;
+    if (!user || !userData || isSaving) return;
+    setIsSaving(true);
+    setSaveStatus(null);
     try {
-      await setDoc(doc(db, "users", user.uid), userData as any, {
+      let aiOrFallbackPlan = calculatePersonalPlan(userData);
+      try {
+        aiOrFallbackPlan = await calculatePlanWithAI(userData);
+      } catch {
+        // fallback remains local heuristic
+      }
+
+      const specialPlan =
+        userData.hasHealthCondition && userData.healthConditionName
+          ? getSuggestedSpecialPlan(userData.healthConditionName)
+          : undefined;
+
+      const nextPlan = {
+        ...(userData.plan ?? {}),
+        ...(aiOrFallbackPlan ?? {}),
+        ...(specialPlan ?? {}),
+      };
+
+      const payload = {
+        ...userData,
+        plan: Object.keys(nextPlan).length ? nextPlan : userData.plan,
+      };
+
+      await setDoc(doc(db, "users", user.uid), payload as any, {
         merge: true,
       });
+      setUserData(payload);
       setEditing(false);
-      Alert.alert("Salvat!", "Datele personale au fost actualizate.");
+      setSaveStatus({
+        type: "success",
+        text: "Plan AI recalculat și datele personale au fost salvate.",
+      });
     } catch {
-      Alert.alert("Eroare", "Nu am putut salva datele.");
+      setSaveStatus({
+        type: "error",
+        text: "Nu am putut salva datele sau recalcula planul AI.",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -381,10 +533,14 @@ export default function Settings() {
           <View style={s.cardHeader}>
             <SectionLabel label="Date personale" />
             {editing ? (
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={s.cardHeaderActions}>
                 <TouchableOpacity
-                  onPress={() => setEditing(false)}
+                  onPress={() => {
+                    setEditing(false);
+                    setSaveStatus(null);
+                  }}
                   style={[s.editBtn, { borderColor: C.textLight }]}
+                  disabled={isSaving}
                 >
                   <Text style={[s.editBtnText, { color: C.textMuted }]}>
                     Anulează
@@ -395,17 +551,26 @@ export default function Settings() {
                   style={[
                     s.editBtn,
                     { backgroundColor: C.accent, borderColor: C.accent },
+                    isSaving && { opacity: 0.75 },
                   ]}
+                  disabled={isSaving}
                 >
-                  <Ionicons name="checkmark" size={13} color="#fff" />
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="checkmark" size={13} color="#fff" />
+                  )}
                   <Text style={[s.editBtnText, { color: "#fff" }]}>
-                    Salvează
+                    {isSaving ? "Se salvează" : "Salvează"}
                   </Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity
-                onPress={() => setEditing(true)}
+                onPress={() => {
+                  setEditing(true);
+                  setSaveStatus(null);
+                }}
                 style={s.editBtn}
               >
                 <Ionicons name="pencil" size={13} color={C.accent} />
@@ -413,6 +578,37 @@ export default function Settings() {
               </TouchableOpacity>
             )}
           </View>
+
+          {saveStatus && (
+            <View
+              style={[
+                s.saveStatusWrap,
+                saveStatus.type === "success"
+                  ? s.saveStatusSuccess
+                  : s.saveStatusError,
+              ]}
+            >
+              <Ionicons
+                name={
+                  saveStatus.type === "success"
+                    ? "checkmark-circle"
+                    : "alert-circle"
+                }
+                size={16}
+                color={saveStatus.type === "success" ? C.success : C.danger}
+              />
+              <Text
+                style={[
+                  s.saveStatusText,
+                  {
+                    color: saveStatus.type === "success" ? C.success : C.danger,
+                  },
+                ]}
+              >
+                {saveStatus.text}
+              </Text>
+            </View>
+          )}
 
           {editing ? (
             <>
@@ -767,9 +963,17 @@ const s = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     marginBottom: 4,
+  },
+  cardHeaderActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginLeft: 8,
+    flexShrink: 1,
   },
 
   // Section label
@@ -797,6 +1001,26 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: C.accent,
+  },
+  saveStatusWrap: {
+    marginBottom: 10,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  saveStatusSuccess: {
+    backgroundColor: C.successLight,
+  },
+  saveStatusError: {
+    backgroundColor: C.dangerLight,
+  },
+  saveStatusText: {
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
   },
 
   // Info row (view mode)

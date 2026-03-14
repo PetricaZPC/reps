@@ -1,7 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  updateDoc,
+} from "firebase/firestore";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Platform,
@@ -65,6 +76,16 @@ interface UserData {
   lastLogDate?: string;
 }
 
+interface WorkoutLog {
+  id: string;
+  presetName: string;
+  difficulty: string;
+  totalSets: number;
+  completedSets: number;
+  totalVolume: number;
+  completedAt: string;
+}
+
 // Helpers
 function SectionLabel({ label }: { label: string }) {
   return <Text style={s.sectionLabel}>{label}</Text>;
@@ -110,35 +131,25 @@ export default function Profile() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [todayWeight, setTodayWeight] = useState("");
   const [weightFocused, setWeightFocused] = useState(false);
+  const [savingWeight, setSavingWeight] = useState(false);
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   const consumedCalories = passData((state) => state.calories) ?? 0;
   const consumedProtein = passData((state) => state.protein) ?? 0;
   const consumedCarbs = passData((state) => state.carbs) ?? 0;
 
-  function hitDailyGoal(
-    goal: string | undefined,
-    targets: { calories: number; protein: number },
-  ) {
-    const g = goal?.toLowerCase() ?? "";
-    const cal = consumedCalories;
-    const prot = consumedProtein;
-    const calTarget = targets.calories;
-    const protTarget = targets.protein;
-    const protOk = prot >= protTarget * 0.9; // allow small margin on protein
-
-    if (g.includes("slab")) {
-      return cal >= calTarget - 200 && cal <= calTarget && protOk;
-    }
-    if (g.includes("masa")) {
-      return cal >= calTarget && cal <= calTarget + 400 && protOk;
-    }
-    // mentinere / default window
-    return cal >= calTarget - 200 && cal <= calTarget + 200 && protOk;
-  }
-
   useEffect(() => {
     loadUserData();
+    loadWorkoutLogs();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUserData();
+      loadWorkoutLogs();
+    }, []),
+  );
 
   const loadUserData = async () => {
     const user = auth.currentUser;
@@ -152,7 +163,29 @@ export default function Profile() {
     }
   };
 
+  const loadWorkoutLogs = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      setLoadingLogs(true);
+      const q = query(
+        collection(db, `users/${user.uid}/workoutLogs`),
+        orderBy("completedAt", "desc"),
+        limit(10),
+      );
+      const snap = await getDocs(q);
+      const logs: WorkoutLog[] = [];
+      snap.forEach((doc) => logs.push({ id: doc.id, ...(doc.data() as any) }));
+      setWorkoutLogs(logs);
+    } catch (e) {
+      console.log("loadWorkoutLogs", e);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
   const logWeight = async () => {
+    if (savingWeight) return;
     const w = parseFloat(todayWeight);
     if (isNaN(w) || w <= 0) {
       Alert.alert("Eroare", "Introdu o greutate valida.");
@@ -178,42 +211,36 @@ export default function Profile() {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yStr = yesterday.toISOString().split("T")[0];
-    const dailyTargets = {
-      calories: userData.plan?.dailyCalories ?? 2000,
-      protein: userData.plan?.dailyProtein ?? 150,
-    };
-    const hitGoal = hitDailyGoal(userData.goal, dailyTargets);
 
     let streak = userData.streak ?? 0;
-    if (hitGoal) {
-      if (userData.lastLogDate === yStr) {
-        streak += 1;
-      } else if (userData.lastLogDate !== TODAY) {
-        streak = 1;
-      }
-    } else {
-      // break the streak if goals are not met
-      streak = 0;
+    if (userData.lastLogDate === yStr) {
+      streak += 1;
+    } else if (userData.lastLogDate !== TODAY) {
+      streak = 1;
     }
 
-    await updateDoc(doc(db, "users", user.uid), {
-      progress,
-      streak,
-      lastLogDate: hitGoal ? TODAY : userData.lastLogDate,
-    } as any);
+    const nextLastLogDate = TODAY;
 
-    setUserData({
-      ...userData,
-      progress,
-      streak,
-      lastLogDate: hitGoal ? TODAY : userData.lastLogDate,
-    });
-    Alert.alert(
-      hitGoal ? "Zi reusita!" : "Greutate salvata",
-      hitGoal
-        ? `${w} kg si obiective atinse pentru azi.`
-        : `${w} kg salvat, dar obiectivele zilnice nu au fost atinse (calorii/proteine).`,
-    );
+    try {
+      setSavingWeight(true);
+      await updateDoc(doc(db, "users", user.uid), {
+        progress,
+        streak,
+        lastLogDate: nextLastLogDate,
+      });
+
+      setUserData({
+        ...userData,
+        progress,
+        streak,
+        lastLogDate: nextLastLogDate,
+      });
+      Alert.alert("Greutate salvată", `${w} kg a fost salvat pentru azi.`);
+    } catch {
+      Alert.alert("Eroare", "Nu am putut salva greutatea.");
+    } finally {
+      setSavingWeight(false);
+    }
   };
 
   if (!userData) {
@@ -246,8 +273,8 @@ export default function Profile() {
   const weightData = recent.map((p) => p.weight);
   const hasChartData = recent.length >= 2;
 
-  const dailyCalories = userData.plan?.dailyCalories ?? 2000;
-  const dailyProtein = userData.plan?.dailyProtein ?? 150;
+  const dailyCalories = Number(userData.plan?.dailyCalories) || 2000;
+  const dailyProtein = Number(userData.plan?.dailyProtein) || 150;
   const dailyCarbs = userData.plan?.dailyCarbs
     ? Number(userData.plan.dailyCarbs)
     : undefined;
@@ -342,7 +369,7 @@ export default function Profile() {
 
         {/* Snapshot */}
         <View style={s.card}>
-          <SectionLabel label="Stare rapida" />
+          <SectionLabel label="Stare rapidă" />
           <View style={s.snapshotRow}>
             <View style={s.snapshotItem}>
               <Text style={s.snapshotLabel}>Greutate</Text>
@@ -362,7 +389,7 @@ export default function Profile() {
             </View>
             <View style={s.snapshotItem}>
               <Text style={s.snapshotLabel}>Obiectiv</Text>
-              <Text style={s.snapshotValue} numberOfLines={1}>
+              <Text style={s.snapshotValue} numberOfLines={2}>
                 {userData.goal || "–"}
               </Text>
             </View>
@@ -441,6 +468,65 @@ export default function Profile() {
           ) : null}
         </View>
 
+        {/* Workout log */}
+        <View style={s.card}>
+          <View style={s.logHeaderRow}>
+            <Text style={s.logHeaderTitle}>Workout log</Text>
+            <TouchableOpacity
+              onPress={loadWorkoutLogs}
+              style={s.logRefresh}
+              activeOpacity={0.8}
+              disabled={loadingLogs}
+            >
+              <Ionicons
+                name="refresh"
+                size={14}
+                color={loadingLogs ? C.textLight : C.accent}
+              />
+              <Text
+                style={[
+                  s.logRefreshText,
+                  loadingLogs && { color: C.textLight },
+                ]}
+              >
+                {loadingLogs ? "..." : "Reîncarcă"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {workoutLogs.length === 0 ? (
+            <Text style={{ color: C.textMuted }}>
+              Niciun antrenament salvat încă.
+            </Text>
+          ) : (
+            workoutLogs.map((log) => {
+              const date = new Date(log.completedAt);
+              const dateStr = isNaN(date.getTime())
+                ? log.completedAt
+                : date.toLocaleDateString();
+              const pct = log.totalSets
+                ? Math.round((log.completedSets / log.totalSets) * 100)
+                : 0;
+              return (
+                <View key={log.id} style={s.logRow}>
+                  <View style={s.logIcon}>
+                    <Ionicons name="barbell" size={16} color={C.accent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.logTitle}>{log.presetName}</Text>
+                    <Text style={s.logSub}>
+                      {dateStr} • {log.difficulty}
+                    </Text>
+                  </View>
+                  <View style={s.logBadge}>
+                    <Text style={s.logBadgeText}>{pct}%</Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
         {userData.hasHealthCondition &&
           (healthCondition || dailyCarbs || dailyFat || dailyVitamins) && (
             <View style={s.card}>
@@ -476,13 +562,22 @@ export default function Profile() {
             />
             <Text style={s.weightUnit}>kg</Text>
             <TouchableOpacity
-              style={s.logBtn}
+              style={[s.logBtn, savingWeight && { opacity: 0.75 }]}
               onPress={logWeight}
               activeOpacity={0.85}
+              disabled={savingWeight}
             >
-              <Ionicons name="checkmark" size={18} color="#fff" />
+              {savingWeight ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="checkmark" size={18} color="#fff" />
+              )}
               <Text style={s.logBtnText}>
-                {todayEntry ? "Actualizeaza" : "Salveaza"}
+                {savingWeight
+                  ? "Se salvează"
+                  : todayEntry
+                    ? "Actualizează"
+                    : "Salvează"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -685,10 +780,11 @@ const s = StyleSheet.create({
 
   snapshotRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
   },
   snapshotItem: {
-    flex: 1,
+    width: "48%",
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
@@ -787,6 +883,53 @@ const s = StyleSheet.create({
     padding: 10,
   },
   todayLoggedText: { fontSize: 13, color: C.textMuted },
+
+  logRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  logIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: C.accentLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logTitle: { fontSize: 14, fontWeight: "700", color: C.text },
+  logSub: { fontSize: 12, color: C.textMuted, marginTop: 2 },
+  logBadge: {
+    minWidth: 44,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: C.accentLight,
+    alignItems: "center",
+  },
+  logBadgeText: { fontSize: 13, fontWeight: "700", color: C.accent },
+
+  logHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  logHeaderTitle: { fontSize: 14, fontWeight: "700", color: C.text },
+  logRefresh: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  logRefreshText: { fontSize: 12, fontWeight: "700", color: C.accent },
 
   deltaChip: {
     flexDirection: "row",

@@ -1,9 +1,10 @@
+import { Ionicons } from "@expo/vector-icons";
 import { addDoc, collection, getDocs, query } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  BackHandler,
   Platform,
-  Pressable,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -14,11 +15,14 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../firebase/firebaseConfig";
 import Camera from "../src/Camera";
 import { EXERCISES, ExerciseConfig, MuscleGroup } from "../src/exercises";
-import { WORKOUT_PRESETS, WorkoutPreset, getPresetExercises } from "../src/workoutPresets";
+import {
+  WORKOUT_PRESETS,
+  WorkoutPreset,
+  getPresetExercises,
+} from "../src/workoutPresets";
 import WorkoutSession, { WorkoutResult } from "../src/WorkoutSession";
 import WorkoutSummary from "../src/WorkoutSummary";
 
@@ -44,6 +48,11 @@ const C = {
   blob2: "#F0E8FF",
 };
 
+const isAndroid = Platform.OS === "android";
+const topInset =
+  Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) : 0;
+const safeTop = Platform.OS === "android" ? topInset + 12 : 12;
+
 const DIFFICULTY_COLOR: Record<string, string> = {
   beginner: C.success,
   intermediate: C.warning,
@@ -55,7 +64,15 @@ const DIFFICULTY_BG: Record<string, string> = {
   advanced: C.dangerLight,
 };
 
-type Screen = "menu" | "presets" | "preset_overview" | "preset_session" | "preset_summary" | "single" | "custom" | "customSelect";
+type Screen =
+  | "menu"
+  | "presets"
+  | "preset_overview"
+  | "preset_session"
+  | "preset_summary"
+  | "single"
+  | "custom"
+  | "customSelect";
 
 interface CustomWorkout {
   id?: string;
@@ -72,7 +89,11 @@ function PageHeader({ title, onBack }: { title: string; onBack?: () => void }) {
   return (
     <View style={s.pageHeader}>
       {onBack && (
-        <TouchableOpacity style={s.backBtn} onPress={onBack} activeOpacity={0.75}>
+        <TouchableOpacity
+          style={s.backBtn}
+          onPress={onBack}
+          activeOpacity={0.75}
+        >
           <Ionicons name="arrow-back" size={18} color={C.text} />
         </TouchableOpacity>
       )}
@@ -91,11 +112,23 @@ function DifficultyBadge({ difficulty }: { difficulty: string }) {
   );
 }
 
-function ExerciseRow({ name, subtitle, index, onPress }: {
-  name: string; subtitle?: string; index?: number; onPress?: () => void;
+function ExerciseRow({
+  name,
+  subtitle,
+  index,
+  onPress,
+}: {
+  name: string;
+  subtitle?: string;
+  index?: number;
+  onPress?: () => void;
 }) {
   return (
-    <TouchableOpacity style={s.exerciseRow} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity
+      style={s.exerciseRow}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
       {index !== undefined && (
         <View style={s.exerciseIndex}>
           <Text style={s.exerciseIndexText}>{index}</Text>
@@ -105,14 +138,28 @@ function ExerciseRow({ name, subtitle, index, onPress }: {
         <Text style={s.exerciseName}>{name}</Text>
         {subtitle && <Text style={s.exerciseSub}>{subtitle}</Text>}
       </View>
-      {onPress && <Ionicons name="chevron-forward" size={16} color={C.textLight} />}
+      {onPress && (
+        <Ionicons name="chevron-forward" size={16} color={C.textLight} />
+      )}
     </TouchableOpacity>
   );
 }
 
-function CheckboxRow({ title, checked, onPress }: { title: string; checked: boolean; onPress: () => void }) {
+function CheckboxRow({
+  title,
+  checked,
+  onPress,
+}: {
+  title: string;
+  checked: boolean;
+  onPress: () => void;
+}) {
   return (
-    <TouchableOpacity style={s.checkboxRow} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity
+      style={s.checkboxRow}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
       <View style={[s.checkbox, checked && s.checkboxChecked]}>
         {checked && <Ionicons name="checkmark" size={12} color="#fff" />}
       </View>
@@ -121,8 +168,16 @@ function CheckboxRow({ title, checked, onPress }: { title: string; checked: bool
   );
 }
 
-function PrimaryBtn({ title, onPress, disabled, icon }: {
-  title: string; onPress: () => void; disabled?: boolean; icon?: any;
+function PrimaryBtn({
+  title,
+  onPress,
+  disabled,
+  icon,
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  icon?: any;
 }) {
   return (
     <TouchableOpacity
@@ -131,13 +186,27 @@ function PrimaryBtn({ title, onPress, disabled, icon }: {
       disabled={disabled}
       activeOpacity={0.85}
     >
-      {icon && <Ionicons name={icon} size={18} color={disabled ? C.textLight : "#fff"} />}
-      <Text style={[s.primaryBtnText, disabled && { color: C.textLight }]}>{title}</Text>
+      {icon && (
+        <Ionicons
+          name={icon}
+          size={18}
+          color={disabled ? C.textLight : "#fff"}
+        />
+      )}
+      <Text style={[s.primaryBtnText, disabled && { color: C.textLight }]}>
+        {title}
+      </Text>
     </TouchableOpacity>
   );
 }
 
-function GroupCard({ title, children }: { title: string; children: React.ReactNode }) {
+function GroupCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <View style={s.groupCard}>
       <SectionLabel label={title} />
@@ -150,8 +219,11 @@ function GroupCard({ title, children }: { title: string; children: React.ReactNo
 export default function Workout() {
   const { width } = useWindowDimensions();
   const [screen, setScreen] = useState<Screen>("menu");
-  const [selectedExercise, setSelectedExercise] = useState<ExerciseConfig | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState<WorkoutPreset | null>(null);
+  const [selectedExercise, setSelectedExercise] =
+    useState<ExerciseConfig | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<WorkoutPreset | null>(
+    null,
+  );
   const [workoutResults, setWorkoutResults] = useState<WorkoutResult[]>([]);
   const [customWorkoutName, setCustomWorkoutName] = useState("");
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
@@ -162,25 +234,124 @@ export default function Workout() {
     loadCustomWorkouts();
   }, [screen]);
 
+  useEffect(() => {
+    const onBackPress = () => {
+      if (screen === "preset_session") {
+        setScreen("preset_overview");
+        return true;
+      }
+      if (screen === "preset_overview") {
+        setSelectedPreset(null);
+        setScreen("presets");
+        return true;
+      }
+      if (screen === "preset_summary") {
+        saveWorkoutLog();
+        setWorkoutResults([]);
+        setSelectedPreset(null);
+        setScreen("presets");
+        return true;
+      }
+      if (screen === "presets") {
+        setSelectedPreset(null);
+        setScreen("menu");
+        return true;
+      }
+      if (screen === "single") {
+        if (selectedExercise) {
+          setSelectedExercise(null);
+          return true;
+        }
+        setScreen("menu");
+        return true;
+      }
+      if (screen === "customSelect") {
+        setScreen("custom");
+        return true;
+      }
+      if (screen === "custom") {
+        setScreen("menu");
+        return true;
+      }
+      return false;
+    };
+
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [screen, selectedExercise, selectedPreset, workoutResults]);
+
+  const saveWorkoutLog = async () => {
+    if (!auth.currentUser || !selectedPreset || workoutResults.length === 0)
+      return;
+    try {
+      const totalSets = workoutResults.reduce(
+        (acc, r) => acc + r.sets.length,
+        0,
+      );
+      const completedSets = workoutResults.reduce(
+        (acc, r) =>
+          acc + r.sets.filter((s) => s.repsOrSeconds >= s.target).length,
+        0,
+      );
+      const totalVolume = workoutResults.reduce(
+        (acc, r) => acc + r.sets.reduce((s, set) => s + set.repsOrSeconds, 0),
+        0,
+      );
+
+      await addDoc(
+        collection(db, `users/${auth.currentUser.uid}/workoutLogs`),
+        {
+          presetId: selectedPreset.id,
+          presetName: selectedPreset.name,
+          difficulty: selectedPreset.difficulty,
+          totalSets,
+          completedSets,
+          totalVolume,
+          completedAt: new Date().toISOString(),
+        },
+      );
+    } catch (e) {
+      console.log("Failed to save workout log", e);
+    }
+  };
+
   const loadCustomWorkouts = async () => {
     if (!auth.currentUser) return;
     try {
-      const q = query(collection(db, `users/${auth.currentUser.uid}/customWorkouts`));
+      const q = query(
+        collection(db, `users/${auth.currentUser.uid}/customWorkouts`),
+      );
       const snapshot = await getDocs(q);
       const workouts: CustomWorkout[] = [];
-      snapshot.forEach((doc) => workouts.push({ id: doc.id, ...doc.data() } as CustomWorkout));
+      snapshot.forEach((doc) =>
+        workouts.push({ id: doc.id, ...doc.data() } as CustomWorkout),
+      );
       setSavedWorkouts(workouts);
     } catch {}
   };
 
   const saveCustomWorkout = async () => {
-    if (!auth.currentUser) { Alert.alert("Eroare", "Trebuie să fii autentificat."); return; }
-    if (!customWorkoutName.trim()) { Alert.alert("Eroare", "Introduceți un nume pentru antrenament."); return; }
-    if (selectedExercises.length === 0) { Alert.alert("Eroare", "Selectați cel puțin un exercițiu."); return; }
+    if (!auth.currentUser) {
+      Alert.alert("Eroare", "Trebuie să fii autentificat.");
+      return;
+    }
+    if (!customWorkoutName.trim()) {
+      Alert.alert("Eroare", "Introduceți un nume pentru antrenament.");
+      return;
+    }
+    if (selectedExercises.length === 0) {
+      Alert.alert("Eroare", "Selectați cel puțin un exercițiu.");
+      return;
+    }
     try {
-      await addDoc(collection(db, `users/${auth.currentUser.uid}/customWorkouts`), {
-        name: customWorkoutName, exercises: selectedExercises, createdAt: new Date().toISOString(),
-      });
+      await addDoc(
+        collection(db, `users/${auth.currentUser.uid}/customWorkouts`),
+        {
+          name: customWorkoutName,
+          exercises: selectedExercises,
+          createdAt: new Date().toISOString(),
+        },
+      );
       Alert.alert("Salvat!", "Antrenamentul tău a fost salvat.");
       setCustomWorkoutName("");
       setSelectedExercises([]);
@@ -192,19 +363,45 @@ export default function Workout() {
 
   const toggleExercise = (key: string) =>
     setSelectedExercises((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
 
   const deleteWorkout = (id: string) =>
-    Alert.alert("Șterge antrenamentul?", "Această acțiune nu poate fi anulată.", [
-      { text: "Anulează", style: "cancel" },
-      { text: "Șterge", style: "destructive", onPress: () => setSavedWorkouts((prev) => prev.filter((w) => w.id !== id)) },
-    ]);
+    Alert.alert(
+      "Șterge antrenamentul?",
+      "Această acțiune nu poate fi anulată.",
+      [
+        { text: "Anulează", style: "cancel" },
+        {
+          text: "Șterge",
+          style: "destructive",
+          onPress: () =>
+            setSavedWorkouts((prev) => prev.filter((w) => w.id !== id)),
+        },
+      ],
+    );
 
-  const muscleGroups: MuscleGroup[] = ["chest", "back", "shoulders", "arms", "core", "legs", "fullbody", "cardio", "stretch"];
+  const muscleGroups: MuscleGroup[] = [
+    "chest",
+    "back",
+    "shoulders",
+    "arms",
+    "core",
+    "legs",
+    "fullbody",
+    "cardio",
+    "stretch",
+  ];
   const muscleLabel: Record<string, string> = {
-    chest: "Piept", back: "Spate", shoulders: "Umeri", arms: "Brațe",
-    core: "Core", legs: "Picioare", fullbody: "Full Body", cardio: "Cardio", stretch: "Stretching",
+    chest: "Piept",
+    back: "Spate",
+    shoulders: "Umeri",
+    arms: "Brațe",
+    core: "Core",
+    legs: "Picioare",
+    fullbody: "Full Body",
+    cardio: "Cardio",
+    stretch: "Stretching",
   };
 
   // ── Preset session ──
@@ -212,7 +409,10 @@ export default function Workout() {
     return (
       <WorkoutSession
         preset={selectedPreset}
-        onFinish={(results) => { setWorkoutResults(results); setScreen("preset_summary"); }}
+        onFinish={(results) => {
+          setWorkoutResults(results);
+          setScreen("preset_summary");
+        }}
         onExit={() => setScreen("preset_overview")}
       />
     );
@@ -224,7 +424,12 @@ export default function Workout() {
       <WorkoutSummary
         preset={selectedPreset}
         results={workoutResults}
-        onClose={() => { setWorkoutResults([]); setScreen("presets"); setSelectedPreset(null); }}
+        onClose={() => {
+          saveWorkoutLog();
+          setWorkoutResults([]);
+          setScreen("presets");
+          setSelectedPreset(null);
+        }}
       />
     );
   }
@@ -232,34 +437,68 @@ export default function Workout() {
   // ── Preset overview ──
   if (screen === "preset_overview" && selectedPreset) {
     const exercises = getPresetExercises(selectedPreset);
-    const totalSets = selectedPreset.difficulty === "beginner" ? 2 : selectedPreset.difficulty === "intermediate" ? 3 : 4;
+    const totalSets =
+      selectedPreset.difficulty === "beginner"
+        ? 2
+        : selectedPreset.difficulty === "intermediate"
+          ? 3
+          : 4;
     return (
       <View style={s.root}>
         <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-        <View style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]} />
-        <SafeAreaView>
-          <PageHeader title={selectedPreset.name} onBack={() => { setSelectedPreset(null); setScreen("presets"); }} />
+        <View
+          style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]}
+        />
+        <SafeAreaView style={s.safeAreaHeader}>
+          <PageHeader
+            title={selectedPreset.name}
+            onBack={() => {
+              setSelectedPreset(null);
+              setScreen("presets");
+            }}
+          />
         </SafeAreaView>
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-          <View style={[s.groupCard, { flexDirection: "row", flexWrap: "wrap", gap: 8 }]}>
+        <ScrollView
+          contentContainerStyle={s.scroll}
+          showsVerticalScrollIndicator={false}
+        >
+          <View
+            style={[
+              s.groupCard,
+              { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+            ]}
+          >
             <DifficultyBadge difficulty={selectedPreset.difficulty} />
             <View style={[s.badge, { backgroundColor: C.accentLight }]}>
-              <Text style={[s.badgeText, { color: C.accent }]}>{exercises.length} exerciții</Text>
+              <Text style={[s.badgeText, { color: C.accent }]}>
+                {exercises.length} exerciții
+              </Text>
             </View>
             <View style={[s.badge, { backgroundColor: C.accentLight }]}>
-              <Text style={[s.badgeText, { color: C.accent }]}>{totalSets} seturi fiecare</Text>
+              <Text style={[s.badgeText, { color: C.accent }]}>
+                {totalSets} seturi fiecare
+              </Text>
             </View>
           </View>
           <Text style={s.presetDesc}>{selectedPreset.description}</Text>
           <GroupCard title="Exerciții">
             {exercises.map((ex, idx) => (
-              <ExerciseRow key={idx} name={ex?.name} subtitle={ex?.muscleGroup} index={idx + 1} />
+              <ExerciseRow
+                key={idx}
+                name={ex?.name}
+                subtitle={ex?.muscleGroup}
+                index={idx + 1}
+              />
             ))}
           </GroupCard>
           <View style={{ height: 100 }} />
         </ScrollView>
         <View style={s.stickyBottom}>
-          <PrimaryBtn title="Începe antrenamentul" onPress={() => setScreen("preset_session")} icon="play" />
+          <PrimaryBtn
+            title="Începe antrenamentul"
+            onPress={() => setScreen("preset_session")}
+            icon="play"
+          />
         </View>
       </View>
     );
@@ -267,26 +506,49 @@ export default function Workout() {
 
   // ── Single exercise ──
   if (screen === "single") {
-    if (selectedExercise) return <Camera exercise={selectedExercise} onExit={() => setSelectedExercise(null)} />;
+    if (selectedExercise)
+      return (
+        <Camera
+          exercise={selectedExercise}
+          onExit={() => setSelectedExercise(null)}
+        />
+      );
     return (
       <View style={s.root}>
         <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-        <View style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]} />
-        <SafeAreaView>
+        <View
+          style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]}
+        />
+        <SafeAreaView style={s.safeAreaHeader}>
           <PageHeader title="Exerciții" onBack={() => setScreen("menu")} />
         </SafeAreaView>
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={s.scroll}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={s.hint}>
-            <Ionicons name="information-circle-outline" size={15} color={C.accent} />
-            <Text style={s.hintText}>Selectează un exercițiu pentru a activa camera</Text>
+            <Ionicons
+              name="information-circle-outline"
+              size={15}
+              color={C.accent}
+            />
+            <Text style={s.hintText}>
+              Selectează un exercițiu pentru a activa camera
+            </Text>
           </View>
           {muscleGroups.map((group) => {
-            const list = Object.keys(EXERCISES).filter((k) => EXERCISES[k].muscleGroup === group);
+            const list = Object.keys(EXERCISES).filter(
+              (k) => EXERCISES[k].muscleGroup === group,
+            );
             if (!list.length) return null;
             return (
               <GroupCard key={group} title={muscleLabel[group]}>
                 {list.map((key) => (
-                  <ExerciseRow key={key} name={EXERCISES[key].name} onPress={() => setSelectedExercise(EXERCISES[key])} />
+                  <ExerciseRow
+                    key={key}
+                    name={EXERCISES[key].name}
+                    onPress={() => setSelectedExercise(EXERCISES[key])}
+                  />
                 ))}
               </GroupCard>
             );
@@ -301,20 +563,33 @@ export default function Workout() {
     return (
       <View style={s.root}>
         <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-        <View style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]} />
-        <SafeAreaView>
-          <PageHeader title="Antrenamente Preset" onBack={() => setScreen("menu")} />
+        <View
+          style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]}
+        />
+        <SafeAreaView style={s.safeAreaHeader}>
+          <PageHeader
+            title="Antrenamente Preset"
+            onBack={() => setScreen("menu")}
+          />
         </SafeAreaView>
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={s.scroll}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={s.hint}>
             <Ionicons name="barbell-outline" size={15} color={C.accent} />
-            <Text style={s.hintText}>Alege un plan complet cu seturi și pauze</Text>
+            <Text style={s.hintText}>
+              Alege un plan complet cu seturi și pauze
+            </Text>
           </View>
           {WORKOUT_PRESETS.map((preset) => (
             <TouchableOpacity
               key={preset.id}
               style={s.presetCard}
-              onPress={() => { setSelectedPreset(preset); setScreen("preset_overview"); }}
+              onPress={() => {
+                setSelectedPreset(preset);
+                setScreen("preset_overview");
+              }}
               activeOpacity={0.82}
             >
               <View style={s.presetCardTop}>
@@ -324,8 +599,14 @@ export default function Workout() {
               <Text style={s.presetCardDesc}>{preset.description}</Text>
               <View style={s.presetCardFooter}>
                 <View style={s.presetStat}>
-                  <Ionicons name="layers-outline" size={13} color={C.textMuted} />
-                  <Text style={s.presetStatText}>{preset.exercises.length} exerciții</Text>
+                  <Ionicons
+                    name="layers-outline"
+                    size={13}
+                    color={C.textMuted}
+                  />
+                  <Text style={s.presetStatText}>
+                    {preset.exercises.length} exerciții
+                  </Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -340,8 +621,11 @@ export default function Workout() {
     return (
       <View style={s.root}>
         <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-        <SafeAreaView>
-          <PageHeader title="Exerciții selectate" onBack={() => setScreen("custom")} />
+        <SafeAreaView style={s.safeAreaHeader}>
+          <PageHeader
+            title="Exerciții selectate"
+            onBack={() => setScreen("custom")}
+          />
         </SafeAreaView>
         <View style={s.customTopBar}>
           <View style={s.nameInputWrap}>
@@ -356,13 +640,30 @@ export default function Workout() {
               onBlur={() => setNameInputFocused(false)}
             />
           </View>
-          <View style={[s.badge, { backgroundColor: C.accentLight, alignSelf: "flex-end", marginBottom: 2 }]}>
-            <Text style={[s.badgeText, { color: C.accent }]}>{selectedExercises.length} selectate</Text>
+          <View
+            style={[
+              s.badge,
+              {
+                backgroundColor: C.accentLight,
+                alignSelf: "flex-end",
+                marginBottom: 2,
+              },
+            ]}
+          >
+            <Text style={[s.badgeText, { color: C.accent }]}>
+              {selectedExercises.length} selectate
+            </Text>
           </View>
         </View>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={s.scroll}
+          showsVerticalScrollIndicator={false}
+        >
           {muscleGroups.map((group) => {
-            const list = Object.keys(EXERCISES).filter((k) => EXERCISES[k].muscleGroup === group);
+            const list = Object.keys(EXERCISES).filter(
+              (k) => EXERCISES[k].muscleGroup === group,
+            );
             if (!list.length) return null;
             return (
               <GroupCard key={group} title={muscleLabel[group]}>
@@ -380,7 +681,12 @@ export default function Workout() {
           <View style={{ height: 100 }} />
         </ScrollView>
         <View style={s.stickyBottom}>
-          <PrimaryBtn title="Salvează antrenamentul" onPress={saveCustomWorkout} disabled={selectedExercises.length === 0} icon="save-outline" />
+          <PrimaryBtn
+            title="Salvează antrenamentul"
+            onPress={saveCustomWorkout}
+            disabled={selectedExercises.length === 0}
+            icon="save-outline"
+          />
         </View>
       </View>
     );
@@ -391,14 +697,26 @@ export default function Workout() {
     return (
       <View style={s.root}>
         <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-        <View style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]} />
-        <SafeAreaView>
-          <PageHeader title="Antrenamentele Mele" onBack={() => setScreen("menu")} />
+        <View
+          style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]}
+        />
+        <SafeAreaView style={s.safeAreaHeader}>
+          <PageHeader
+            title="Antrenamentele Mele"
+            onBack={() => setScreen("menu")}
+          />
         </SafeAreaView>
-        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={s.scroll}
+          showsVerticalScrollIndicator={false}
+        >
           <TouchableOpacity
             style={s.createCard}
-            onPress={() => { setCustomWorkoutName(""); setSelectedExercises([]); setScreen("customSelect"); }}
+            onPress={() => {
+              setCustomWorkoutName("");
+              setSelectedExercises([]);
+              setScreen("customSelect");
+            }}
             activeOpacity={0.82}
           >
             <View style={s.createCardIcon}>
@@ -425,13 +743,23 @@ export default function Workout() {
                   activeOpacity={0.75}
                 >
                   <View style={s.savedWorkoutIcon}>
-                    <Ionicons name="barbell-outline" size={16} color={C.accent} />
+                    <Ionicons
+                      name="barbell-outline"
+                      size={16}
+                      color={C.accent}
+                    />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.savedWorkoutName}>{w.name}</Text>
-                    <Text style={s.savedWorkoutSub}>{w.exercises.length} exerciții</Text>
+                    <Text style={s.savedWorkoutSub}>
+                      {w.exercises.length} exerciții
+                    </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={C.textLight} />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={C.textLight}
+                  />
                 </TouchableOpacity>
               ))}
             </GroupCard>
@@ -439,7 +767,9 @@ export default function Workout() {
             <View style={s.emptyState}>
               <Text style={{ fontSize: 32, marginBottom: 10 }}>💪</Text>
               <Text style={s.emptyTitle}>Niciun antrenament salvat</Text>
-              <Text style={s.emptySub}>Creează primul tău plan personalizat</Text>
+              <Text style={s.emptySub}>
+                Creează primul tău plan personalizat
+              </Text>
             </View>
           )}
         </ScrollView>
@@ -451,11 +781,30 @@ export default function Workout() {
   return (
     <View style={s.root}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-      <View style={[s.blob, { top: -80, left: -60, backgroundColor: C.blob1 }]} />
-      <View style={[s.blob, { top: 140, right: -100, width: 260, height: 260, backgroundColor: C.blob2 }]} />
+      <View
+        style={[s.blob, { top: -80, left: -60, backgroundColor: C.blob1 }]}
+      />
+      <View
+        style={[
+          s.blob,
+          {
+            top: 140,
+            right: -100,
+            width: 260,
+            height: 260,
+            backgroundColor: C.blob2,
+          },
+        ]}
+      />
 
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={[s.scroll, { paddingTop: Platform.OS === "ios" ? 20 : 40 }]} showsVerticalScrollIndicator={false}>
+      <SafeAreaView style={[s.safeArea, { paddingTop: safeTop }]}>
+        <ScrollView
+          contentContainerStyle={[
+            s.scroll,
+            { paddingTop: safeTop + (Platform.OS === "ios" ? 8 : 12) },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={s.menuHeader}>
             <View style={s.menuIconWrap}>
@@ -467,9 +816,24 @@ export default function Workout() {
 
           {/* Menu cards */}
           {[
-            { title: "Antrenamente Preset", sub: "Planuri complete cu seturi & pauze", icon: "library-outline", screen: "presets" as Screen },
-            { title: "Antrenamentele Mele", sub: "Planuri salvate și personalizate", icon: "bookmark-outline", screen: "custom" as Screen },
-            { title: "Exercițiu Single", sub: "Antrenează o singură mișcare", icon: "body-outline", screen: "single" as Screen },
+            {
+              title: "Antrenamente Preset",
+              sub: "Planuri complete cu seturi & pauze",
+              icon: "library-outline",
+              screen: "presets" as Screen,
+            },
+            {
+              title: "Antrenamentele Mele",
+              sub: "Planuri salvate și personalizate",
+              icon: "bookmark-outline",
+              screen: "custom" as Screen,
+            },
+            {
+              title: "Exercițiu Single",
+              sub: "Antrenează o singură mișcare",
+              icon: "body-outline",
+              screen: "single" as Screen,
+            },
           ].map((item) => (
             <TouchableOpacity
               key={item.screen}
@@ -496,7 +860,15 @@ export default function Workout() {
 // ─── Styles ──────────────────────────────────────────────────
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  blob: { position: "absolute", width: 280, height: 280, borderRadius: 140, opacity: 0.5 },
+  safeArea: { flex: 1 },
+  safeAreaHeader: { paddingTop: safeTop },
+  blob: {
+    position: "absolute",
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    opacity: 0.5,
+  },
   scroll: { paddingHorizontal: 20, paddingBottom: 24, gap: 12 },
 
   // Page header
@@ -508,7 +880,8 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-    backgroundColor: C.glass,
+    backgroundColor: isAndroid ? C.surface : C.glass,
+    marginBottom: 12,
   },
   backBtn: {
     width: 34,
@@ -520,12 +893,21 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  pageTitle: { fontSize: 19, fontWeight: "700", color: C.text, letterSpacing: -0.4 },
+  pageTitle: {
+    fontSize: 19,
+    fontWeight: "700",
+    color: C.text,
+    letterSpacing: -0.4,
+  },
 
   // Section label
   sectionLabel: {
-    fontSize: 11, fontWeight: "700", color: C.accent,
-    letterSpacing: 1.4, textTransform: "uppercase", marginBottom: 12,
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.accent,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+    marginBottom: 12,
   },
 
   // Badge
@@ -534,16 +916,16 @@ const s = StyleSheet.create({
 
   // Group card
   groupCard: {
-    backgroundColor: C.glass,
+    backgroundColor: isAndroid ? C.surface : C.glass,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.glassBorder,
+    borderColor: isAndroid ? C.border : C.glassBorder,
     padding: 18,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowOpacity: isAndroid ? 0.08 : 0.05,
+    shadowRadius: isAndroid ? 12 : 16,
+    elevation: isAndroid ? 4 : 2,
   },
 
   // Exercise row
@@ -556,9 +938,12 @@ const s = StyleSheet.create({
     borderBottomColor: C.border,
   },
   exerciseIndex: {
-    width: 26, height: 26, borderRadius: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
     backgroundColor: C.accentLight,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
   exerciseIndexText: { fontSize: 11, fontWeight: "700", color: C.accent },
   exerciseName: { fontSize: 14, fontWeight: "600", color: C.text },
@@ -574,9 +959,13 @@ const s = StyleSheet.create({
     borderBottomColor: C.border,
   },
   checkbox: {
-    width: 20, height: 20, borderRadius: 5,
-    borderWidth: 1.5, borderColor: C.textLight,
-    alignItems: "center", justifyContent: "center",
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: C.textLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   checkboxChecked: { backgroundColor: C.accent, borderColor: C.accent },
   checkboxLabel: { fontSize: 14, color: C.text, flex: 1 },
@@ -603,15 +992,22 @@ const s = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
-  primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "700", letterSpacing: 0.2 },
+  primaryBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
 
   // Sticky bottom
   stickyBottom: {
     position: "absolute",
-    bottom: 0, left: 0, right: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 20,
     paddingBottom: Platform.OS === "ios" ? 36 : 20,
-    backgroundColor: C.glass,
+    backgroundColor: isAndroid ? C.surface : C.glass,
     borderTopWidth: 1,
     borderTopColor: C.border,
   },
@@ -630,20 +1026,37 @@ const s = StyleSheet.create({
 
   // Preset card
   presetCard: {
-    backgroundColor: C.glass,
+    backgroundColor: isAndroid ? C.surface : C.glass,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.glassBorder,
+    borderColor: isAndroid ? C.border : C.glassBorder,
     padding: 18,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowOpacity: isAndroid ? 0.08 : 0.05,
+    shadowRadius: isAndroid ? 12 : 16,
+    elevation: isAndroid ? 4 : 2,
   },
-  presetCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
-  presetCardName: { fontSize: 16, fontWeight: "700", color: C.text, letterSpacing: -0.3, flex: 1, marginRight: 8 },
-  presetCardDesc: { fontSize: 13, color: C.textMuted, lineHeight: 18, marginBottom: 10 },
+  presetCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 6,
+  },
+  presetCardName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.text,
+    letterSpacing: -0.3,
+    flex: 1,
+    marginRight: 8,
+  },
+  presetCardDesc: {
+    fontSize: 13,
+    color: C.textMuted,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
   presetCardFooter: { flexDirection: "row", gap: 12 },
   presetStat: { flexDirection: "row", alignItems: "center", gap: 4 },
   presetStatText: { fontSize: 12, color: C.textMuted },
@@ -655,13 +1068,19 @@ const s = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: C.glass,
+    backgroundColor: isAndroid ? C.surface : C.glass,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
     alignItems: "flex-end",
   },
   nameInputWrap: { flex: 1 },
-  fieldLabel: { fontSize: 11, fontWeight: "600", color: C.textMuted, letterSpacing: 0.5, marginBottom: 5 },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 5,
+  },
   nameInput: {
     backgroundColor: C.bg,
     borderRadius: 12,
@@ -679,21 +1098,24 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    backgroundColor: C.glass,
+    backgroundColor: isAndroid ? C.surface : C.glass,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.glassBorder,
+    borderColor: isAndroid ? C.border : C.glassBorder,
     padding: 18,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowOpacity: isAndroid ? 0.08 : 0.05,
+    shadowRadius: isAndroid ? 12 : 16,
+    elevation: isAndroid ? 4 : 2,
   },
   createCardIcon: {
-    width: 44, height: 44, borderRadius: 13,
+    width: 44,
+    height: 44,
+    borderRadius: 13,
     backgroundColor: C.accentLight,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
   createCardTitle: { fontSize: 15, fontWeight: "700", color: C.text },
   createCardSub: { fontSize: 12, color: C.textMuted, marginTop: 2 },
@@ -708,55 +1130,84 @@ const s = StyleSheet.create({
     borderBottomColor: C.border,
   },
   savedWorkoutIcon: {
-    width: 32, height: 32, borderRadius: 9,
+    width: 32,
+    height: 32,
+    borderRadius: 9,
     backgroundColor: C.accentLight,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
   savedWorkoutName: { fontSize: 14, fontWeight: "600", color: C.text },
   savedWorkoutSub: { fontSize: 12, color: C.textMuted, marginTop: 1 },
 
   // Empty state
   emptyState: {
-    backgroundColor: C.glass,
+    backgroundColor: isAndroid ? C.surface : C.glass,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.glassBorder,
+    borderColor: isAndroid ? C.border : C.glassBorder,
     padding: 32,
     alignItems: "center",
   },
-  emptyTitle: { fontSize: 15, fontWeight: "700", color: C.text, marginBottom: 4 },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.text,
+    marginBottom: 4,
+  },
   emptySub: { fontSize: 13, color: C.textMuted, textAlign: "center" },
 
   // Menu
-  menuHeader: { alignItems: "center", paddingTop: 16, paddingBottom: 24, gap: 8 },
+  menuHeader: {
+    alignItems: "center",
+    paddingTop: 16,
+    paddingBottom: 24,
+    gap: 8,
+  },
   menuIconWrap: {
-    width: 60, height: 60, borderRadius: 18,
+    width: 60,
+    height: 60,
+    borderRadius: 18,
     backgroundColor: C.accentLight,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 4,
   },
-  menuTitle: { fontSize: 28, fontWeight: "700", color: C.text, letterSpacing: -0.6 },
+  menuTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: C.text,
+    letterSpacing: -0.6,
+  },
   menuSub: { fontSize: 15, color: C.textMuted },
   menuCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    backgroundColor: C.glass,
+    backgroundColor: isAndroid ? C.surface : C.glass,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.glassBorder,
+    borderColor: isAndroid ? C.border : C.glassBorder,
     padding: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowOpacity: isAndroid ? 0.08 : 0.05,
+    shadowRadius: isAndroid ? 12 : 16,
+    elevation: isAndroid ? 4 : 2,
   },
   menuCardIcon: {
-    width: 48, height: 48, borderRadius: 14,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: C.accentLight,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  menuCardTitle: { fontSize: 16, fontWeight: "700", color: C.text, letterSpacing: -0.3 },
+  menuCardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.text,
+    letterSpacing: -0.3,
+  },
   menuCardSub: { fontSize: 13, color: C.textMuted, marginTop: 2 },
 });

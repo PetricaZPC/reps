@@ -25,9 +25,7 @@ export async function Gemini(userMessage: string) {
               {
                 parts: [
                   {
-                    text:
-                      "Esti un expert in nutritie. Analizeaza ce a mancat utilizatorul si returneaza DOAR un JSON valid cu: nume_aliment, calorii, carbohidrati, proteine, vitamine (array de string), minerale (array de string).\n\nUtilizator a mancat: " +
-                      userMessage,
+                    text: userMessage,
                   },
                 ],
               },
@@ -111,11 +109,19 @@ export function extractCalories(responseText: string): {
       minerals.forEach((m) => mineralsSet.add(m));
     };
 
-    if (Array.isArray(jsonData)) {
-      for (const item of jsonData) {
+    const normalizedItems = Array.isArray(jsonData)
+      ? jsonData
+      : Array.isArray(jsonData?.items)
+        ? jsonData.items
+        : Array.isArray(jsonData?.alimente)
+          ? jsonData.alimente
+          : null;
+
+    if (normalizedItems) {
+      for (const item of normalizedItems) {
         processItem(item);
       }
-    } else {
+    } else if (jsonData && typeof jsonData === "object") {
       processItem(jsonData);
     }
 

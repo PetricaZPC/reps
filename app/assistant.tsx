@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { useEffect, useRef, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { doc, getDoc } from "firebase/firestore";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { auth, db } from "../firebase/firebaseConfig";
 import { passData } from "../src/passData";
 import { Gemini, extractCalories } from "../src/useGemini";
 
@@ -28,10 +30,9 @@ export default function Assistant() {
   const addProtein = passData((state) => state.addProtein);
   const addCarbs = passData((state) => state.addCarbs);
 
-  // Daily targets (example values, can be set by user)
-  const [caloriesTarget] = useState(2000);
-  const [proteinTarget] = useState(150);
-  const [carbsTarget] = useState(250);
+  const [caloriesTarget, setCaloriesTarget] = useState(2000);
+  const [proteinTarget, setProteinTarget] = useState(150);
+  const [carbsTarget, setCarbsTarget] = useState(250);
   const [currentCalories, setCurrentCalories] = useState(0);
   const [currentProtein, setCurrentProtein] = useState(0);
   const [currentCarbs, setCurrentCarbs] = useState(0);
@@ -42,8 +43,142 @@ export default function Assistant() {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages, isTyping]);
 
+  const loadTargets = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (!snap.exists()) return;
+      const data = snap.data() as any;
+      const dailyCalories = Number(data?.plan?.dailyCalories);
+      const dailyProtein = Number(data?.plan?.dailyProtein);
+      const dailyCarbs = Number(data?.plan?.dailyCarbs);
+
+      if (!Number.isNaN(dailyCalories) && dailyCalories > 0) {
+        setCaloriesTarget(dailyCalories);
+      }
+      if (!Number.isNaN(dailyProtein) && dailyProtein > 0) {
+        setProteinTarget(dailyProtein);
+      }
+      if (!Number.isNaN(dailyCarbs) && dailyCarbs > 0) {
+        setCarbsTarget(dailyCarbs);
+      }
+    } catch {
+      // keep default targets
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTargets();
+  }, [loadTargets]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadTargets();
+    }, [loadTargets]),
+  );
+
   const goBack = () => {
     navigation.goBack();
+  };
+
+  const buildNutritionPrompt = (inputText: string) =>
+    `Ești expert în nutriție. Analizează mâncarea descrisă mai jos și răspunde DOAR cu JSON valid, fără text extra, fără markdown, fără blocuri de cod.
+Schema JSON:
+{
+  "items": [
+    {
+      "nume_aliment": "string",
+      "calorii": number,
+      "carbohidrati": number,
+      "proteine": number,
+      "vitamine": ["string"],
+      "minerale": ["string"]
+    }
+  ]
+}
+Dacă lipsesc cantități, estimează porții uzuale.
+Input utilizator: ${inputText}`;
+
+  const buildMealPlanPrompt = (inputText: string) =>
+    `Ești asistent de nutriție sportivă. Creează un plan alimentar pentru azi care să ajute utilizatorul să își atingă targetul zilnic.
+Target utilizator: ${caloriesTarget} kcal, ${proteinTarget} g proteine, ${carbsTarget} g carbohidrați.
+Constrângeri/cerințe utilizator: ${inputText}
+
+Răspunde în română, clar și practic, cu:
+1) mese pe ore (mic dejun, prânz, cină + gustări)
+2) cantități aproximative
+3) total estimat calorii/proteine/carbohidrați
+4) sfaturi scurte de ajustare dacă rămâne sub/peste target.`;
+
+  const isOnTopic = (text: string) => {
+    const topicKeywords = [
+      "manc",
+      "mânc",
+      "aliment",
+      "nutri",
+      "calor",
+      "protein",
+      "carb",
+      "grăsim",
+      "grasim",
+      "vitamin",
+      "mineral",
+      "retet",
+      "rețet",
+      "recipe",
+      "plan alimentar",
+      "meal plan",
+      "meniu",
+      "masa",
+      "slab",
+      "bulk",
+      "deficit",
+      "surplus",
+      "bmi",
+      "sport",
+      "antren",
+      "workout",
+      "fitness",
+    ];
+    return topicKeywords.some((k) => text.includes(k));
+  };
+
+  const isMealPlanRequest = (text: string) => {
+    const mealPlanKeywords = [
+      "plan alimentar",
+      "plan de mese",
+      "meal plan",
+      "meniu",
+      "ce sa mananc",
+      "ce să mănânc",
+      "ce mananc azi",
+      "ce mănânc azi",
+      "ating target",
+      "ating obiectiv",
+      "plan pe azi",
+    ];
+    return mealPlanKeywords.some((k) => text.includes(k));
+  };
+
+  const isNutritionLogRequest = (text: string) => {
+    const nutritionKeywords = [
+      "am mancat",
+      "am mâncat",
+      "am baut",
+      "am băut",
+      "calculeaza",
+      "calculează",
+      "calorii",
+      "proteine",
+      "carbo",
+      "macros",
+      "macro",
+      "kcal",
+      "gram",
+      "g ",
+    ];
+    return nutritionKeywords.some((k) => text.includes(k));
   };
 
   const getMessage = async () => {
@@ -53,110 +188,112 @@ export default function Assistant() {
     getUserText("");
     setIsTyping(true);
     try {
-      let response = "";
-      let isRecipe =
+      const isRecipe =
         input.includes("retetă") ||
         input.includes("rețetă") ||
         input.includes("recipe");
-      let isCalculation =
-        input.includes("calorii") ||
-        input.includes("protein") ||
-        input.includes("carb") ||
-        input.includes("vitamin") ||
-        input.includes("mineral") ||
-        input.includes("calculează") ||
-        input.includes("calculate");
+
+      const mealPlanRequested = isMealPlanRequest(input);
+      const nutritionLogRequested = isNutritionLogRequest(input);
+      const onTopic = isOnTopic(input);
+
+      if (!onTopic) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            from: "ai",
+            text: "Sunt specializat pe nutriție și sport (calorii, macro-uri, plan alimentar, rețete, recomandări pentru obiectiv). Pentru alt subiect nu sunt cel mai potrivit asistent.",
+          },
+        ]);
+        return;
+      }
+
+      if (mealPlanRequested) {
+        const mealPlanResponse = await Gemini(buildMealPlanPrompt(userText));
+        setMessages((prev) => [...prev, { from: "ai", text: mealPlanResponse }]);
+        return;
+      }
 
       if (isRecipe) {
-        // Include targets in prompt
         const recipePrompt = `${userText} Ține cont că targetul zilnic al utilizatorului este ${caloriesTarget} calorii, ${proteinTarget}g proteină și ${carbsTarget}g carbohidrați. Oferă o rețetă care să se încadreze în aceste valori.`;
-        response = await Gemini(recipePrompt);
-      } else if (isCalculation) {
-        response = await Gemini(userText);
-        const extracted = extractCalories(response);
-        if (extracted) {
-          setCurrentCalories((prev) => prev + extracted.calories);
-          setCurrentProtein((prev) => prev + extracted.protein);
-          setCurrentCarbs((prev) => prev + extracted.carbs);
-          addCalories(extracted.calories);
-          addProtein(extracted.protein);
-          addCarbs(extracted.carbs);
+        const response = await Gemini(recipePrompt);
+        setMessages((prev) => [...prev, { from: "ai", text: response }]);
+        return;
+      }
 
-          if (extracted.vitamins.length) {
-            setCurrentVitamins((prev) => [
-              ...new Set([...prev, ...extracted.vitamins]),
-            ]);
-          }
+      if (!nutritionLogRequested) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            from: "ai",
+            text: "Te pot ajuta cu nutriție/sport. Dacă vrei calcul, scrie ce ai mâncat + cantitatea (ex: 200g pui, 150g orez). Dacă vrei plan, spune «fă-mi un plan alimentar pentru azi».",
+          },
+        ]);
+        return;
+      }
 
-          if (extracted.minerals.length) {
-            setCurrentMinerals((prev) => [
-              ...new Set([...prev, ...extracted.minerals]),
-            ]);
-          }
+      const response = await Gemini(buildNutritionPrompt(userText));
+      const extracted = extractCalories(response);
 
-          // Add progress message
-          const calProgress = Math.min(
-            ((currentCalories + extracted.calories) / caloriesTarget) * 100,
-            100,
-          );
-          const protProgress = Math.min(
-            ((currentProtein + extracted.protein) / proteinTarget) * 100,
-            100,
-          );
-          const carbProgress = Math.min(
-            ((currentCarbs + extracted.carbs) / carbsTarget) * 100,
-            100,
-          );
+      const hasNutritionData =
+        extracted.calories > 0 ||
+        extracted.protein > 0 ||
+        extracted.carbs > 0 ||
+        extracted.vitamins.length > 0 ||
+        extracted.minerals.length > 0;
 
-          const vitaminsMerged = [
-            ...new Set([...currentVitamins, ...extracted.vitamins]),
-          ];
-          const mineralsMerged = [
-            ...new Set([...currentMinerals, ...extracted.minerals]),
-          ];
-
-          setMessages((prev) => [
-            ...prev,
-            { from: "ai", text: response },
-            {
-              from: "ai",
-              text: `Adaugat la target: ${extracted.calories} cal, ${extracted.protein}g prot, ${extracted.carbs}g carb.\nProgres zilnic: Calorii ${Math.round(calProgress)}%, Proteină ${Math.round(protProgress)}%, Carbohidrați ${Math.round(carbProgress)}%.\nVitamine detectate: ${vitaminsMerged.length ? vitaminsMerged.join(", ") : "-"}.\nMinerale detectate: ${mineralsMerged.length ? mineralsMerged.join(", ") : "-"}.`,
-            },
-          ]);
-          setIsTyping(false);
-          return;
-        }
+      if (!hasNutritionData) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            from: "ai",
+            text: "Nu am putut estima valorile nutriționale din mesaj. Încearcă să scrii alimentul + cantitatea (ex: 200g piept de pui, 1 banană, 2 ouă).",
+          },
+        ]);
+        return;
       } else {
-        response =
-          "Salut! Sunt asistentul tău nutrițional. Pot să calculez calorii și proteine din alimente sau să îți ofer rețete de mâncare adaptate la targetul tău zilnic. Ce ai dori să facem?";
-      }
+        setCurrentCalories((prev) => prev + extracted.calories);
+        setCurrentProtein((prev) => prev + extracted.protein);
+        setCurrentCarbs((prev) => prev + extracted.carbs);
+        addCalories(extracted.calories);
+        addProtein(extracted.protein);
+        addCarbs(extracted.carbs);
 
-      setMessages((prev) => [...prev, { from: "ai", text: response }]);
+        if (extracted.vitamins.length) {
+          setCurrentVitamins((prev) => [
+            ...new Set([...prev, ...extracted.vitamins]),
+          ]);
+        }
 
-      // For recipes, still extract if possible
-      if (isRecipe) {
-        const extracted = extractCalories(response);
-        if (extracted) {
-          setCurrentCalories((prev) => prev + extracted.calories);
-          setCurrentProtein((prev) => prev + extracted.protein);
-          setCurrentCarbs((prev) => prev + extracted.carbs);
-          addCalories(extracted.calories);
-          addProtein(extracted.protein);
-          addCarbs(extracted.carbs);
-
-          if (extracted.vitamins.length) {
-            setCurrentVitamins((prev) => [
-              ...new Set([...prev, ...extracted.vitamins]),
-            ]);
-          }
-
-          if (extracted.minerals.length) {
-            setCurrentMinerals((prev) => [
-              ...new Set([...prev, ...extracted.minerals]),
-            ]);
-          }
+        if (extracted.minerals.length) {
+          setCurrentMinerals((prev) => [
+            ...new Set([...prev, ...extracted.minerals]),
+          ]);
         }
       }
+
+      const nextCalories = currentCalories + extracted.calories;
+      const nextProtein = currentProtein + extracted.protein;
+      const nextCarbs = currentCarbs + extracted.carbs;
+
+      const calProgress = Math.min((nextCalories / caloriesTarget) * 100, 100);
+      const protProgress = Math.min((nextProtein / proteinTarget) * 100, 100);
+      const carbProgress = Math.min((nextCarbs / carbsTarget) * 100, 100);
+
+      const vitaminsMerged = [
+        ...new Set([...currentVitamins, ...extracted.vitamins]),
+      ];
+      const mineralsMerged = [
+        ...new Set([...currentMinerals, ...extracted.minerals]),
+      ];
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          from: "ai",
+          text: `Adăugat la target: ${extracted.calories} cal, ${extracted.protein}g prot, ${extracted.carbs}g carb.\nProgres zilnic: Calorii ${Math.round(calProgress)}%, Proteină ${Math.round(protProgress)}%, Carbohidrați ${Math.round(carbProgress)}%.\nVitamine detectate: ${vitaminsMerged.length ? vitaminsMerged.join(", ") : "-"}.\nMinerale detectate: ${mineralsMerged.length ? mineralsMerged.join(", ") : "-"}.`,
+        },
+      ]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
