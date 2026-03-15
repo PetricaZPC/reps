@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   Text,
   TouchableOpacity,
   useWindowDimensions,
@@ -35,6 +36,8 @@ interface CameraProps {
   targetReps?: number;
   setNumber?: number;
   totalSets?: number;
+  uiRotate?: Animated.AnimatedInterpolation<string>;
+  isLandscape?: boolean;
 }
 
 interface ErrorBoundaryProps {
@@ -75,6 +78,8 @@ export default function Camera({
   targetReps = 12,
   setNumber = 1,
   totalSets = 3,
+  uiRotate,
+  isLandscape = false,
 }: CameraProps) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -114,6 +119,9 @@ export default function Camera({
   const lowVisibilityCount = useRef(0);
   const lastFrameTime = useRef(0);
   const FRAME_INTERVAL = 1000 / 30;
+  const warningRotateStyle = uiRotate
+    ? ({ transform: [{ rotate: uiRotate }] } as const)
+    : undefined;
 
   // Remount MediaPipe la schimbarea orientarii
 
@@ -526,7 +534,7 @@ export default function Camera({
       )}
 
       {positionWarning && isReady && (
-        <View
+        <Animated.View
           style={{
             position: "absolute",
             top: safeTop + 72,
@@ -539,6 +547,7 @@ export default function Camera({
             flexDirection: "row",
             alignItems: "center",
             gap: 8,
+            ...(warningRotateStyle ?? {}),
           }}
         >
           <Text style={{ fontSize: 16 }}>📍</Text>
@@ -547,7 +556,7 @@ export default function Camera({
           >
             Position yourself better in front of the camera
           </Text>
-        </View>
+        </Animated.View>
       )}
 
       {!workoutMode && !started && (
@@ -683,11 +692,11 @@ export default function Camera({
       )}
 
       {isReady && exercise.type === "timed" && formWarning && (
-        <View
+        <Animated.View
           style={{
             position: "absolute",
             // safeTop asigură că nu intră sub bara de status/notch
-            top: safeTop + (workoutMode ? 72 : 72),
+            top: safeTop + (workoutMode && isLandscape ? 56 : 72),
             left: 16,
             right: 16,
             backgroundColor: "rgba(239,68,68,0.92)",
@@ -697,13 +706,14 @@ export default function Camera({
             alignItems: "center",
             flexDirection: "row",
             gap: 8,
+            ...(warningRotateStyle ?? {}),
           }}
         >
           <Text style={{ fontSize: 18 }}>⚠️</Text>
           <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
             Corectează postura!
           </Text>
-        </View>
+        </Animated.View>
       )}
 
       {!workoutMode && (
@@ -835,14 +845,15 @@ export default function Camera({
       )}
 
       {workoutMode && isReady && formFeedback.length > 0 && (
-        <View
+        <Animated.View
           style={{
             position: "absolute",
-            bottom: 100,
+            bottom: isLandscape ? 118 : 100,
             left: 16,
             right: 16,
             zIndex: 20,
             gap: 6,
+            ...(warningRotateStyle ?? {}),
           }}
         >
           {formFeedback.map((msg, idx) => (
@@ -870,7 +881,7 @@ export default function Camera({
               </Text>
             </View>
           ))}
-        </View>
+        </Animated.View>
       )}
     </View>
   );

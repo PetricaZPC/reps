@@ -1,30 +1,33 @@
-import React from 'react';
-import { useWindowDimensions } from 'react-native';
-import Svg, { Circle, Line } from 'react-native-svg';
-import { landmarkIndexMap } from './exercises';
+import React from "react";
+import { useWindowDimensions } from "react-native";
+import Svg, { Circle, Line } from "react-native-svg";
+import { landmarkIndexMap } from "./exercises";
 
-const CONNECTIONS: [keyof typeof landmarkIndexMap, keyof typeof landmarkIndexMap][] = [
-  ['leftShoulder', 'rightShoulder'],
-  ['leftShoulder', 'leftHip'],
-  ['rightShoulder', 'rightHip'],
-  ['leftHip', 'rightHip'],
-  ['leftShoulder', 'leftElbow'],
-  ['leftElbow', 'leftWrist'],
-  ['rightShoulder', 'rightElbow'],
-  ['rightElbow', 'rightWrist'],
-  ['leftHip', 'leftKnee'],
-  ['leftKnee', 'leftAnkle'],
-  ['rightHip', 'rightKnee'],
-  ['rightKnee', 'rightAnkle'],
+const CONNECTIONS: [
+  keyof typeof landmarkIndexMap,
+  keyof typeof landmarkIndexMap,
+][] = [
+  ["leftShoulder", "rightShoulder"],
+  ["leftShoulder", "leftHip"],
+  ["rightShoulder", "rightHip"],
+  ["leftHip", "rightHip"],
+  ["leftShoulder", "leftElbow"],
+  ["leftElbow", "leftWrist"],
+  ["rightShoulder", "rightElbow"],
+  ["rightElbow", "rightWrist"],
+  ["leftHip", "leftKnee"],
+  ["leftKnee", "leftAnkle"],
+  ["rightHip", "rightKnee"],
+  ["rightKnee", "rightAnkle"],
 ];
 
 const JOINTS: (keyof typeof landmarkIndexMap)[] = [
-  'leftShoulder', 'rightShoulder',
-  'leftElbow', 'rightElbow',
-  'leftWrist', 'rightWrist',
-  'leftHip', 'rightHip',
-  'leftKnee', 'rightKnee',
-  'leftAnkle', 'rightAnkle',
+  "leftShoulder", "rightShoulder",
+  "leftElbow",    "rightElbow",
+  "leftWrist",    "rightWrist",
+  "leftHip",      "rightHip",
+  "leftKnee",     "rightKnee",
+  "leftAnkle",    "rightAnkle",
 ];
 
 interface Props {
@@ -42,6 +45,7 @@ export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props)
     const point = landmarks[idx];
     if (!point) return null;
     return {
+      // Coordonatele MediaPipe sunt normalizate 0-1, le scalăm pe ecran
       x: point.x * width,
       y: point.y * height,
       visibility: point.visibility ?? 1,
@@ -50,32 +54,15 @@ export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props)
 
   const isAffected = (name: string) => affectedLandmarks.includes(name);
 
-  // Calculeaza bounding box al scheletului
-  const allPositions = JOINTS.map(name => getLandmarkPos(name)).filter(
-    p => p !== null && p.visibility >= 0.5
-  ) as { x: number; y: number; visibility: number }[];
-
-  if (allPositions.length === 0) return null;
-
-  const minX = Math.min(...allPositions.map(p => p.x));
-  const maxX = Math.max(...allPositions.map(p => p.x));
-  const minY = Math.min(...allPositions.map(p => p.y));
-  const maxY = Math.max(...allPositions.map(p => p.y));
-
-  const padding = 40;
-  const boxX = Math.max(0, minX - padding);
-  const boxY = Math.max(0, minY - padding);
-  const boxW = Math.min(width - boxX, maxX - minX + padding * 2);
-  const boxH = Math.min(height - boxY, maxY - minY + padding * 2);
-
   return (
+    // viewBox = exact dimensiunile ecranului, fără distorsiune
+    // Nu mai folosim viewBox custom sau preserveAspectRatio
     <Svg
       width={width}
       height={height}
-      style={{ position: 'absolute', top: 0, left: 0, zIndex: 10 }}
-      viewBox={`${boxX} ${boxY} ${boxW} ${boxH}`}
-      preserveAspectRatio="none"
+      style={{ position: "absolute", top: 0, left: 0, zIndex: 10 }}
     >
+      {/* Linii de conexiune */}
       {CONNECTIONS.map(([from, to], idx) => {
         const p1 = getLandmarkPos(from);
         const p2 = getLandmarkPos(to);
@@ -87,12 +74,14 @@ export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props)
             key={idx}
             x1={p1.x} y1={p1.y}
             x2={p2.x} y2={p2.y}
-            stroke={affected ? '#ef4444' : '#22c55e'}
+            stroke={affected ? "#ef4444" : "#22c55e"}
             strokeWidth={affected ? 4 : 3}
             strokeOpacity={0.85}
           />
         );
       })}
+
+      {/* Cercuri articulații */}
       {JOINTS.map((name) => {
         const pos = getLandmarkPos(name);
         if (!pos || pos.visibility < 0.5) return null;
@@ -103,7 +92,7 @@ export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props)
             cx={pos.x}
             cy={pos.y}
             r={affected ? 9 : 6}
-            fill={affected ? '#ef4444' : '#22c55e'}
+            fill={affected ? "#ef4444" : "#22c55e"}
             fillOpacity={0.9}
           />
         );
