@@ -74,49 +74,79 @@ const EMPTY: UserData = {
   progress: [],
 };
 
-// Small heuristic to prefill special plan targets based on the named condition
-function getSuggestedSpecialPlan(condition: string) {
+const HEALTH_CONDITIONS = [
+  { id: "diabet", label: "Diabet" },
+  { id: "hipertensiune", label: "Hipertensiune" },
+  { id: "anemie", label: "Anemie" },
+  { id: "colesterol", label: "Colesterol crescut" },
+  { id: "tiroida", label: "Afecțiuni tiroidă" },
+  { id: "digestiv", label: "Sensibilitate digestivă" },
+];
+
+function getSuggestedSpecialPlan(
+  condition: string,
+  user: UserData,
+  basePlan?: {
+    dailyCalories?: number;
+    dailyProtein?: number;
+    dailyCarbs?: number;
+    dailyFat?: number;
+  },
+) {
   const c = condition.toLowerCase().trim();
   if (!c) return undefined;
+
+  const weight = Number(user.weight) || 70;
+  const age = Number(user.age) || 30;
+
+  const dailyCalories = Number(basePlan?.dailyCalories) || 2000;
+  let dailyProtein = Number(basePlan?.dailyProtein) || Math.round(weight * 1.6);
+  let dailyCarbs =
+    Number(basePlan?.dailyCarbs) ||
+    Math.max(Math.round((dailyCalories * 0.45) / 4), 120);
+  let dailyFat =
+    Number(basePlan?.dailyFat) ||
+    Math.max(Math.round((dailyCalories * 0.28) / 9), 45);
+  let dailyVitamins = "";
+
   if (c.includes("diab")) {
-    return {
-      dailyCarbs: 150,
-      dailyFat: 60,
-      dailyVitamins: "Omega-3, Magneziu, Vitamina D",
-    };
+    dailyCarbs = Math.min(dailyCarbs, Math.round(weight * 2.0));
+    dailyFat = Math.min(dailyFat, Math.round(weight * 0.9));
+    dailyVitamins = "Omega-3, Magneziu, Vitamina D";
   }
   if (c.includes("tensiune") || c.includes("hipert")) {
-    return {
-      dailyCarbs: 180,
-      dailyFat: 65,
-      dailyVitamins: "Magneziu, Potasiu, Omega-3",
-    };
+    dailyCarbs = Math.min(dailyCarbs, Math.round(weight * 2.4));
+    dailyFat = Math.min(dailyFat, Math.round(weight * 0.85));
+    dailyVitamins = "Magneziu, Potasiu, Omega-3";
   }
   if (c.includes("anemie")) {
-    return {
-      dailyCarbs: 200,
-      dailyFat: 70,
-      dailyVitamins: "Fier, B12, Folat, Vitamina C",
-    };
+    dailyProtein = Math.max(dailyProtein, Math.round(weight * 1.8));
+    dailyCarbs = Math.max(dailyCarbs, Math.round(weight * 2.5));
+    dailyVitamins = "Fier, B12, Folat, Vitamina C";
   }
   if (c.includes("colesterol") || c.includes("dislip")) {
-    return {
-      dailyCarbs: 190,
-      dailyFat: 55,
-      dailyVitamins: "Omega-3, Fibre 25-30g, Steroli vegetali",
-    };
+    dailyFat = Math.min(dailyFat, Math.round(weight * 0.7));
+    dailyCarbs = Math.max(dailyCarbs, Math.round(weight * 2.2));
+    dailyVitamins = "Omega-3, Fibre 25-30g, Steroli vegetali";
   }
   if (c.includes("tiroid")) {
-    return {
-      dailyCarbs: 190,
-      dailyFat: 65,
-      dailyVitamins: "Iod moderat, Seleniu, Vitamina D",
-    };
+    dailyCarbs = age > 45 ? Math.round(weight * 2.2) : Math.round(weight * 2.5);
+    dailyFat = Math.min(dailyFat, Math.round(weight * 0.9));
+    dailyVitamins = "Iod moderat, Seleniu, Vitamina D";
   }
+
+  if (!dailyVitamins) {
+    dailyFat = Math.min(dailyFat, Math.round(weight * 0.85));
+    dailyCarbs = Math.max(dailyCarbs, Math.round(weight * 2.1));
+    dailyVitamins = "Probiotice, Vitamina D, Magneziu";
+  }
+
   return {
-    dailyCarbs: 200,
-    dailyFat: 70,
-    dailyVitamins: "Multivitamine, Omega-3, Magneziu",
+    dailyCalories,
+    dailyProtein,
+    dailyCarbs,
+    dailyFat,
+    dailyVitamins,
   };
 }
 
@@ -400,7 +430,11 @@ export default function Settings() {
 
       const specialPlan =
         userData.hasHealthCondition && userData.healthConditionName
-          ? getSuggestedSpecialPlan(userData.healthConditionName)
+          ? getSuggestedSpecialPlan(
+              userData.healthConditionName,
+              userData,
+              aiOrFallbackPlan,
+            )
           : undefined;
 
       const nextPlan = {
@@ -627,22 +661,40 @@ export default function Settings() {
                 }}
               />
               {userData.hasHealthCondition && (
-                <Field
-                  label="Condiție medicală"
-                  value={userData.healthConditionName ?? ""}
-                  onChangeText={(v) => {
-                    const suggestion = getSuggestedSpecialPlan(v);
-                    const nextPlan = suggestion
-                      ? { ...(userData.plan ?? {}), ...suggestion }
-                      : userData.plan;
-                    setUserData({
-                      ...userData,
-                      healthConditionName: v,
-                      plan: nextPlan,
-                    });
-                  }}
-                  placeholder="ex: diabet, hipertensiune"
-                />
+                <View style={s.fieldWrap}>
+                  <Text style={s.fieldLabel}>Condiție medicală</Text>
+                  <View style={s.conditionChoicesWrap}>
+                    {HEALTH_CONDITIONS.map((condition) => {
+                      const active =
+                        userData.healthConditionName === condition.label;
+                      return (
+                        <TouchableOpacity
+                          key={condition.id}
+                          style={[
+                            s.conditionChoice,
+                            active && s.conditionChoiceActive,
+                          ]}
+                          onPress={() =>
+                            setUserData({
+                              ...userData,
+                              healthConditionName: condition.label,
+                            })
+                          }
+                          activeOpacity={0.8}
+                        >
+                          <Text
+                            style={[
+                              s.conditionChoiceText,
+                              active && s.conditionChoiceTextActive,
+                            ]}
+                          >
+                            {condition.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
               )}
               <View style={s.fieldRow}>
                 <View style={{ flex: 1 }}>
@@ -708,42 +760,17 @@ export default function Settings() {
               />
 
               {userData.hasHealthCondition && (
-                <>
-                  <SectionLabel label="Plan special nutrienți" />
-                  <Field
-                    label="Carbohidrați țintă (g)"
-                    value={userData.plan?.dailyCarbs?.toString() ?? ""}
-                    onChangeText={(v) =>
-                      setUserData({
-                        ...userData,
-                        plan: { ...userData.plan, dailyCarbs: v },
-                      })
-                    }
-                    keyboard="numeric"
+                <View style={s.autoPlanNote}>
+                  <Ionicons
+                    name="sparkles-outline"
+                    size={14}
+                    color={C.accent}
                   />
-                  <Field
-                    label="Grăsimi țintă (g)"
-                    value={userData.plan?.dailyFat?.toString() ?? ""}
-                    onChangeText={(v) =>
-                      setUserData({
-                        ...userData,
-                        plan: { ...userData.plan, dailyFat: v },
-                      })
-                    }
-                    keyboard="numeric"
-                  />
-                  <Field
-                    label="Vitamine / note speciale"
-                    value={userData.plan?.dailyVitamins ?? ""}
-                    onChangeText={(v) =>
-                      setUserData({
-                        ...userData,
-                        plan: { ...userData.plan, dailyVitamins: v },
-                      })
-                    }
-                    placeholder="ex: complex B, D3 2000UI, magneziu"
-                  />
-                </>
+                  <Text style={s.autoPlanNoteText}>
+                    Planul special se calculează automat la salvare, pe baza
+                    vârstei, greutății, înălțimii și condiției medicale.
+                  </Text>
+                </View>
               )}
             </>
           ) : (
@@ -1141,6 +1168,50 @@ const s = StyleSheet.create({
   toggleLabel: {
     fontSize: 14,
     color: C.text,
+    fontWeight: "600",
+  },
+  conditionChoicesWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  conditionChoice: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "transparent",
+  },
+  conditionChoiceActive: {
+    borderColor: C.accent,
+    backgroundColor: C.accentLight,
+  },
+  conditionChoiceText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.textMuted,
+  },
+  conditionChoiceTextActive: {
+    color: C.accent,
+  },
+  autoPlanNote: {
+    marginTop: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.accentLight,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  autoPlanNoteText: {
+    fontSize: 12,
+    color: C.text,
+    flex: 1,
+    lineHeight: 17,
     fontWeight: "600",
   },
 
