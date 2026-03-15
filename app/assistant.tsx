@@ -24,6 +24,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, db } from "../firebase/firebaseConfig";
+import { saveTodayNutrition } from "../src/nutritionPersistence";
 import { passData } from "../src/passData";
 import {
   AssistantContext,
@@ -77,6 +78,8 @@ interface Message {
   text: string;
   imageUri?: string;
   nutritionData?: SmartResponse["nutritionData"];
+  nutritionConfirmed?: boolean;
+  confirmedRatio?: number;
 }
 
 const DEFAULT_MESSAGES: Message[] = [
@@ -100,13 +103,29 @@ function NutritionCard({
   protTarget,
   sessionCal,
   sessionProt,
+  confirmed,
+  confirmedRatio,
+  onConfirm,
 }: {
   data: NonNullable<SmartResponse["nutritionData"]>;
   calTarget: number;
   protTarget: number;
   sessionCal: number;
   sessionProt: number;
+  confirmed?: boolean;
+  confirmedRatio?: number;
+  onConfirm: (ratio: number) => void;
 }) {
+  const [portionPct, setPortionPct] = useState(100);
+
+  const clampPct = (value: number) => Math.min(Math.max(value, 1), 300);
+  const ratio = clampPct(portionPct) / 100;
+
+  const adjustedCalories = Math.round(data.calories * ratio);
+  const adjustedProtein = Math.round(data.protein * ratio * 10) / 10;
+  const adjustedCarbs = Math.round(data.carbs * ratio * 10) / 10;
+  const adjustedFat = Math.round(data.fat * ratio * 10) / 10;
+
   const calPct = Math.min(Math.round((sessionCal / calTarget) * 100), 100);
   const protPct = Math.min(Math.round((sessionProt / protTarget) * 100), 100);
   const calLeft = Math.max(calTarget - sessionCal, 0);
@@ -176,6 +195,70 @@ function NutritionCard({
           )}
         </View>
       )}
+
+      <View style={nc.confirmWrap}>
+        <Text style={nc.confirmTitle}>Ai mâncat toată porția?</Text>
+        {!confirmed && (
+          <>
+            <View style={nc.portionControls}>
+              <TouchableOpacity
+                style={nc.portionBtn}
+                onPress={() => setPortionPct((prev) => clampPct(prev - 25))}
+                activeOpacity={0.8}
+              >
+                <Text style={nc.portionBtnText}>-25%</Text>
+              </TouchableOpacity>
+
+              <TextInput
+                style={nc.portionInput}
+                value={String(portionPct)}
+                onChangeText={(val) => {
+                  const digitsOnly = val.replace(/[^0-9]/g, "");
+                  if (!digitsOnly) {
+                    setPortionPct(100);
+                    return;
+                  }
+                  setPortionPct(clampPct(Number(digitsOnly)));
+                }}
+                keyboardType="number-pad"
+                maxLength={3}
+              />
+              <Text style={nc.portionSuffix}>%</Text>
+
+              <TouchableOpacity
+                style={nc.portionBtn}
+                onPress={() => setPortionPct((prev) => clampPct(prev + 25))}
+                activeOpacity={0.8}
+              >
+                <Text style={nc.portionBtnText}>+25%</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={nc.adjustedText}>
+              Se vor adăuga: {adjustedCalories} kcal, {adjustedProtein}g
+              protein, {adjustedCarbs}g carbs, {adjustedFat}g fat
+            </Text>
+
+            <TouchableOpacity
+              style={nc.confirmBtn}
+              onPress={() => onConfirm(ratio)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark-circle" size={16} color="#fff" />
+              <Text style={nc.confirmBtnText}>Confirmă că am mâncat</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {confirmed && (
+          <View style={nc.doneRow}>
+            <Ionicons name="checkmark-circle" size={16} color={C.success} />
+            <Text style={nc.doneText}>
+              Adăugat în progres ({Math.round((confirmedRatio ?? 1) * 100)}%)
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -239,6 +322,54 @@ const nc = StyleSheet.create({
   barLeft: { fontSize: 11, color: C.textMuted },
   micro: { gap: 3 },
   microText: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
+  confirmWrap: {
+    marginTop: 2,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    gap: 8,
+  },
+  confirmTitle: { fontSize: 12, fontWeight: "700", color: C.text },
+  portionControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  portionBtn: {
+    backgroundColor: C.accentLight,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  portionBtnText: { fontSize: 11, fontWeight: "700", color: C.accent },
+  portionInput: {
+    minWidth: 46,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    backgroundColor: C.bg,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    textAlign: "center",
+    color: C.text,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  portionSuffix: { fontSize: 12, fontWeight: "700", color: C.textMuted },
+  adjustedText: { fontSize: 11, color: C.textMuted, lineHeight: 16 },
+  confirmBtn: {
+    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: C.success,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  confirmBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  doneRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  doneText: { fontSize: 12, color: C.success, fontWeight: "700" },
 });
 
 // ─── Typing dots ──────────────────────────────────────────────
@@ -291,6 +422,9 @@ export default function Assistant() {
   const addCalories = passData((st) => st.addCalories);
   const addProtein = passData((st) => st.addProtein);
   const addCarbs = passData((st) => st.addCarbs);
+  const consumedCalories = passData((state) => state.calories) ?? 0;
+  const consumedProtein = passData((state) => state.protein) ?? 0;
+  const consumedCarbs = passData((state) => state.carbs) ?? 0;
 
   const [calTarget, setCalTarget] = useState(2000);
   const [protTarget, setProtTarget] = useState(150);
@@ -305,9 +439,6 @@ export default function Assistant() {
   // istoricul antrenamentelor — pentru recomandări inteligente
   const [recentWorkouts, setRecentWorkouts] = useState<WorkoutLogEntry[]>([]);
 
-  const [sessionCal, setSessionCal] = useState(0);
-  const [sessionProt, setSessionProt] = useState(0);
-  const [sessionCarb, setSessionCarb] = useState(0);
   const userId = auth.currentUser?.uid;
 
   useEffect(() => {
@@ -441,6 +572,42 @@ export default function Assistant() {
     }, [loadTargets]),
   );
 
+  const confirmNutritionFromMessage = async (
+    messageIndex: number,
+    data: NonNullable<SmartResponse["nutritionData"]>,
+    ratio: number,
+  ) => {
+    const clampedRatio = Math.min(Math.max(ratio, 0.01), 3);
+    const addedCalories = Math.round(data.calories * clampedRatio);
+    const addedProtein = Math.round(data.protein * clampedRatio * 10) / 10;
+    const addedCarbs = Math.round(data.carbs * clampedRatio * 10) / 10;
+
+    addCalories(addedCalories);
+    addProtein(addedProtein);
+    addCarbs(addedCarbs);
+
+    const currentTotals = passData.getState();
+    if (userId) {
+      saveTodayNutrition(userId, {
+        calories: currentTotals.calories,
+        protein: currentTotals.protein,
+        carbs: currentTotals.carbs,
+      }).catch(() => {});
+    }
+
+    setMessages((prev) =>
+      prev.map((msg, idx) =>
+        idx === messageIndex
+          ? {
+              ...msg,
+              nutritionConfirmed: true,
+              confirmedRatio: clampedRatio,
+            }
+          : msg,
+      ),
+    );
+  };
+
   // ── Send ───────────────────────────────────────────────────
   const send = async (text?: string) => {
     const raw = (text ?? userText).trim();
@@ -454,9 +621,9 @@ export default function Assistant() {
       caloriesTarget: calTarget,
       proteinTarget: protTarget,
       carbTarget: carbTarget,
-      sessionCalories: sessionCal,
-      sessionProtein: sessionProt,
-      sessionCarbs: sessionCarb,
+      sessionCalories: consumedCalories,
+      sessionProtein: consumedProtein,
+      sessionCarbs: consumedCarbs,
       userGoal,
       userActivity,
       userAge,
@@ -478,25 +645,16 @@ export default function Assistant() {
         historyRef.current = historyRef.current.slice(-20);
       }
 
-      // Dacă avem date nutriționale, actualizăm totalurile
+      // Dacă avem date nutriționale, cerem confirmare înainte de a adăuga în progres
       if (result.nutritionData) {
         const nd = result.nutritionData;
-        const newCal = sessionCal + nd.calories;
-        const newProt = sessionProt + nd.protein;
-        const newCarb = sessionCarb + nd.carbs;
-        setSessionCal(newCal);
-        setSessionProt(newProt);
-        setSessionCarb(newCarb);
-        addCalories(nd.calories);
-        addProtein(nd.protein);
-        addCarbs(nd.carbs);
-
         setMessages((prev) => [
           ...prev,
           {
             from: "ai",
             text: result.text,
-            nutritionData: { ...nd },
+            nutritionData: nd,
+            nutritionConfirmed: false,
           },
         ]);
       } else {
@@ -607,9 +765,9 @@ export default function Assistant() {
         caloriesTarget: calTarget,
         proteinTarget: protTarget,
         carbTarget: carbTarget,
-        sessionCalories: sessionCal,
-        sessionProtein: sessionProt,
-        sessionCarbs: sessionCarb,
+        sessionCalories: consumedCalories,
+        sessionProtein: consumedProtein,
+        sessionCarbs: consumedCarbs,
         userGoal,
         userActivity,
         userAge,
@@ -644,22 +802,13 @@ export default function Assistant() {
 
       if (result.nutritionData) {
         const nd = result.nutritionData;
-        const newCal = sessionCal + nd.calories;
-        const newProt = sessionProt + nd.protein;
-        const newCarb = sessionCarb + nd.carbs;
-        setSessionCal(newCal);
-        setSessionProt(newProt);
-        setSessionCarb(newCarb);
-        addCalories(nd.calories);
-        addProtein(nd.protein);
-        addCarbs(nd.carbs);
-
         setMessages((prev) => [
           ...prev,
           {
             from: "ai",
             text: result.text,
-            nutritionData: { ...nd },
+            nutritionData: nd,
+            nutritionConfirmed: false,
           },
         ]);
       } else {
@@ -781,8 +930,17 @@ export default function Assistant() {
                     data={msg.nutritionData}
                     calTarget={calTarget}
                     protTarget={protTarget}
-                    sessionCal={sessionCal}
-                    sessionProt={sessionProt}
+                    sessionCal={consumedCalories}
+                    sessionProt={consumedProtein}
+                    confirmed={msg.nutritionConfirmed}
+                    confirmedRatio={msg.confirmedRatio}
+                    onConfirm={(ratio) =>
+                      confirmNutritionFromMessage(
+                        idx,
+                        msg.nutritionData!,
+                        ratio,
+                      )
+                    }
                   />
                 )}
               </View>

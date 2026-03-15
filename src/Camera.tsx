@@ -1,7 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import {
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ExerciseConfig, calculateAngle, landmarkIndexMap } from "./exercises";
+import { calculateAngle, ExerciseConfig, landmarkIndexMap } from "./exercises";
 import SkeletonOverlay from "./skeletonOverlay";
 
 function getExpoCamera() {
@@ -49,8 +54,12 @@ class MediapipeErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false };
   }
-  static getDerivedStateFromError(): ErrorBoundaryState { return { hasError: true }; }
-  componentDidCatch(error: unknown): void { console.log("Mediapipe render error:", error); }
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown): void {
+    console.log("Mediapipe render error:", error);
+  }
   render(): React.ReactNode {
     if (this.state.hasError) return this.props.fallback;
     return this.props.children;
@@ -70,6 +79,7 @@ export default function Camera({
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const safeTop = insets.top + 8;
+  const safeLeft = insets.left;
 
   const expoCamera = getExpoCamera();
   const hasExpoCamera = !!expoCamera?.useCameraPermissions;
@@ -97,7 +107,7 @@ export default function Camera({
   const lastRepTime = useRef(0);
   const plankActive = useRef(false);
   const plankInterval = useRef<any>(null);
-  const lastFeedbackRef = useRef<string>('');
+  const lastFeedbackRef = useRef<string>("");
   const formViolationTime = useRef<Record<string, number>>({});
   const countdownRef = useRef<any>(null);
   const lastPositionWarnTime = useRef(0);
@@ -107,31 +117,31 @@ export default function Camera({
 
   // Remount MediaPipe la schimbarea orientarii
 
-// Reset stare doar la schimbarea exercitiului
-useEffect(() => {
-  setReps(0);
-  setSeconds(0);
-  setStarted(false);
-  setIsReady(false);
-  setCountdown(5);
-  setFormWarning(false);
-  setFormFeedback([]);
-  setAffectedLandmarks([]);
-  setPositionWarning(false);
-  upPosRef.current = false;
-  repsRef.current = 0;
-  plankActive.current = false;
-  lastFeedbackRef.current = '';
-  formViolationTime.current = {};
-  lowVisibilityCount.current = 0;
-  lastPositionWarnTime.current = 0;
-  lastFrameTime.current = 0;
-  if (plankInterval.current) clearInterval(plankInterval.current);
-  if (countdownRef.current) clearInterval(countdownRef.current);
-  isReadyRef.current = false;
+  // Reset stare doar la schimbarea exercitiului
+  useEffect(() => {
+    setReps(0);
+    setSeconds(0);
+    setStarted(false);
+    setIsReady(false);
+    setCountdown(5);
+    setFormWarning(false);
+    setFormFeedback([]);
+    setAffectedLandmarks([]);
+    setPositionWarning(false);
+    upPosRef.current = false;
+    repsRef.current = 0;
+    plankActive.current = false;
+    lastFeedbackRef.current = "";
+    formViolationTime.current = {};
+    lowVisibilityCount.current = 0;
+    lastPositionWarnTime.current = 0;
+    lastFrameTime.current = 0;
+    if (plankInterval.current) clearInterval(plankInterval.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    isReadyRef.current = false;
 
-  if (workoutMode) startCountdown();
-}, [exercise.name, workoutMode]);
+    if (workoutMode) startCountdown();
+  }, [exercise.name, workoutMode]);
 
   const startCountdown = () => {
     setStarted(true);
@@ -157,7 +167,9 @@ useEffect(() => {
     let parsed: any;
     try {
       parsed = typeof data === "string" ? JSON.parse(data) : data;
-    } catch (e) { parsed = data; }
+    } catch (e) {
+      parsed = data;
+    }
 
     let landmarkArray: any[] | null = null;
     if (
@@ -171,18 +183,26 @@ useEffect(() => {
 
     if (!landmarkArray || landmarkArray.length === 0) return;
 
-    const landmarks2D = Array.isArray(parsed.landmarks) && parsed.landmarks.length > 0
-      ? parsed.landmarks : null;
+    const landmarks2D =
+      Array.isArray(parsed.landmarks) && parsed.landmarks.length > 0
+        ? parsed.landmarks
+        : null;
 
     if (landmarks2D) setSkeletonLandmarks(landmarks2D);
 
     if (landmarks2D && isReadyRef.current) {
-      const keyPoints = ['leftShoulder', 'rightShoulder', 'leftHip', 'rightHip'];
-      const visibilities = keyPoints.map(name => {
+      const keyPoints = [
+        "leftShoulder",
+        "rightShoulder",
+        "leftHip",
+        "rightHip",
+      ];
+      const visibilities = keyPoints.map((name) => {
         const idx = landmarkIndexMap[name];
         return landmarks2D[idx]?.visibility ?? 0;
       });
-      const avgVisibility = visibilities.reduce((a, b) => a + b, 0) / visibilities.length;
+      const avgVisibility =
+        visibilities.reduce((a, b) => a + b, 0) / visibilities.length;
 
       if (avgVisibility < 0.4) {
         lowVisibilityCount.current += 1;
@@ -201,9 +221,14 @@ useEffect(() => {
         const idx = landmarkIndexMap[name];
         return landmarks2D[idx];
       });
-      const allVisible = points2D.length > 0 && points2D.every(
-        (p: any) => p && typeof p.x === 'number' && (p.visibility ?? 0) >= MIN_VISIBILITY
-      );
+      const allVisible =
+        points2D.length > 0 &&
+        points2D.every(
+          (p: any) =>
+            p &&
+            typeof p.x === "number" &&
+            (p.visibility ?? 0) >= MIN_VISIBILITY,
+        );
       if (!allVisible) {
         upPosRef.current = false;
         return;
@@ -224,30 +249,6 @@ useEffect(() => {
       });
     }
 
-    // worldLandmarks (landmarkObj) = coordonate 3D, fără câmpul visibility
-    // landmarks 2D (landmarkObj2D) = are câmpul visibility pus de MediaPipe
-    // Folosim 2D pentru check vizibilitate, 3D pentru calculul unghiului
-    const MIN_VISIBILITY = 0.5;
-    if (landmarks2D) {
-      const points2D = exercise.landmarks.map(
-        (name: string) => landmarkObj2D[name],
-      );
-      const allVisible =
-        points2D.length > 0 &&
-        points2D.every(
-          (p: any) =>
-            p &&
-            typeof p.x === "number" &&
-            (p.visibility ?? 0) >= MIN_VISIBILITY,
-        );
-      if (!allVisible) {
-        // Resetăm upPosRef — altfel când reintri în cadru într-o poziție
-        // intermediară s-ar putea număra o rep falsă
-        upPosRef.current = false;
-        return;
-      }
-    }
-
     const points = exercise.landmarks.map((name: string) => landmarkObj[name]);
     if (
       !points.length ||
@@ -262,7 +263,9 @@ useEffect(() => {
 
     if (landmarks2D) {
       exercise.formRules.forEach((rule) => {
-        const rulePoints = rule.landmarks.map((name: string) => landmarkObj2D[name]);
+        const rulePoints = rule.landmarks.map(
+          (name: string) => landmarkObj2D[name],
+        );
         if (!rulePoints.every((p: any) => p && typeof p.x === "number")) return;
 
         const ruleAngle = calculateAngle(
@@ -292,7 +295,7 @@ useEffect(() => {
       });
     }
 
-    const newFeedback = violations.join('|');
+    const newFeedback = violations.join("|");
     if (newFeedback !== lastFeedbackRef.current) {
       lastFeedbackRef.current = newFeedback;
       setFormFeedback(violations);
@@ -301,11 +304,13 @@ useEffect(() => {
 
     if (now - lastLogTime.current > 1000) {
       lastLogTime.current = now;
-      console.log('EXERCISE:', exercise.name, '| angle:', angle.toFixed(1));
+      console.log("EXERCISE:", exercise.name, "| angle:", angle.toFixed(1));
     }
 
     if (exercise.type === "timed") {
-      const mainPoints = exercise.landmarks.map((name: string) => landmarkObj[name]);
+      const mainPoints = exercise.landmarks.map(
+        (name: string) => landmarkObj[name],
+      );
       const pointsVisible = mainPoints.every(
         (p: any) => p && typeof p.x === "number" && (p.visibility ?? 1) > 0.3,
       );
@@ -317,7 +322,7 @@ useEffect(() => {
 
         if (goodForm) {
           plankInterval.current = setInterval(() => {
-            setSeconds(prev => {
+            setSeconds((prev) => {
               const next = prev + 1;
               onSecondsUpdate?.(next);
               return next;
@@ -400,7 +405,15 @@ useEffect(() => {
       >
         Rebuild the app natively after installing camera modules.
       </Text>
-      <TouchableOpacity onPress={onExit} style={{ backgroundColor: "#4F6EF7", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+      <TouchableOpacity
+        onPress={onExit}
+        style={{
+          backgroundColor: "#4F6EF7",
+          paddingHorizontal: 24,
+          paddingVertical: 12,
+          borderRadius: 12,
+        }}
+      >
         <Text style={{ color: "#fff", fontWeight: "600" }}>Înapoi</Text>
       </TouchableOpacity>
     </View>
@@ -415,19 +428,52 @@ useEffect(() => {
   }
   if (!permission) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
-        <Text style={{ color: "#fff", fontSize: 16 }}>Se încarcă camera...</Text>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#000",
+        }}
+      >
+        <Text style={{ color: "#fff", fontSize: 16 }}>
+          Se încarcă camera...
+        </Text>
       </View>
     );
   }
 
   if (!permission.granted) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000", paddingHorizontal: 32 }}>
-        <Text style={{ color: "#fff", fontSize: 18, marginBottom: 8, fontWeight: "700", textAlign: "center" }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#000",
+          paddingHorizontal: 32,
+        }}
+      >
+        <Text
+          style={{
+            color: "#fff",
+            fontSize: 18,
+            marginBottom: 8,
+            fontWeight: "700",
+            textAlign: "center",
+          }}
+        >
           Permisiune cameră necesară
         </Text>
-        <Text style={{ color: "#8A8FA8", fontSize: 14, textAlign: "center", marginBottom: 28, lineHeight: 20 }}>
+        <Text
+          style={{
+            color: "#8A8FA8",
+            fontSize: 14,
+            textAlign: "center",
+            marginBottom: 28,
+            lineHeight: 20,
+          }}
+        >
           Aplicația are nevoie de acces la cameră pentru a detecta mișcările.
         </Text>
         <TouchableOpacity
@@ -439,7 +485,9 @@ useEffect(() => {
             borderRadius: 14,
           }}
         >
-          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Acordă permisiunea</Text>
+          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
+            Acordă permisiunea
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -449,7 +497,8 @@ useEffect(() => {
     <View style={{ flex: 1, backgroundColor: "#000" }}>
       {MediapipeView ? (
         <MediapipeErrorBoundary fallback={cameraFallback}>
-          <RNMediapipe
+          <MediapipeView
+            key={orientationKey}
             width={width}
             height={height}
             face={false}
@@ -462,7 +511,7 @@ useEffect(() => {
             rightLeg={false}
             leftAnkle={false}
             rightAnkle={false}
-            onLandmark={(data) => handleLandmark(data)}
+            onLandmark={(data: any) => handleLandmark(data)}
           />
         </MediapipeErrorBoundary>
       ) : (
@@ -477,30 +526,55 @@ useEffect(() => {
       )}
 
       {positionWarning && isReady && (
-        <View style={{
-          position: "absolute",
-          top: safeTop + 72,
-          left: safeLeft + 16,
-          right: 16,
-          backgroundColor: "rgba(234,179,8,0.92)",
-          borderRadius: 12, padding: 12, zIndex: 25,
-          flexDirection: "row", alignItems: "center", gap: 8,
-        }}>
+        <View
+          style={{
+            position: "absolute",
+            top: safeTop + 72,
+            left: safeLeft + 16,
+            right: 16,
+            backgroundColor: "rgba(234,179,8,0.92)",
+            borderRadius: 12,
+            padding: 12,
+            zIndex: 25,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
           <Text style={{ fontSize: 16 }}>📍</Text>
-          <Text style={{ color: "#000", fontWeight: "700", fontSize: 14, flex: 1 }}>
+          <Text
+            style={{ color: "#000", fontWeight: "700", fontSize: 14, flex: 1 }}
+          >
             Position yourself better in front of the camera
           </Text>
         </View>
       )}
 
       {!workoutMode && !started && (
-        <View style={{
-          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-          justifyContent: "center", alignItems: "center",
-          backgroundColor: "rgba(0,0,0,0.82)", zIndex: 30,
-          paddingHorizontal: 28,
-        }}>
-          <Text style={{ color: "#fff", fontSize: 26, fontWeight: "700", marginBottom: 10, textAlign: "center", letterSpacing: -0.5 }}>
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.82)",
+            zIndex: 30,
+            paddingHorizontal: 28,
+          }}
+        >
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 26,
+              fontWeight: "700",
+              marginBottom: 10,
+              textAlign: "center",
+              letterSpacing: -0.5,
+            }}
+          >
             {exercise.name}
           </Text>
           <Text
@@ -548,58 +622,107 @@ useEffect(() => {
               START
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={onExit} style={{ paddingHorizontal: 40, paddingVertical: 12 }}>
+          <TouchableOpacity
+            onPress={onExit}
+            style={{ paddingHorizontal: 40, paddingVertical: 12 }}
+          >
             <Text style={{ color: "#8A8FA8", fontSize: 15 }}>Înapoi</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {started && !isReady && (
-        <View style={{
-          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-          justifyContent: "center", alignItems: "center",
-          backgroundColor: "rgba(0,0,0,0.75)", zIndex: 30,
-        }}>
-          <Text style={{ color: "#8A8FA8", fontSize: 15, marginBottom: 6 }}>{exercise.name}</Text>
-          <Text style={{ color: "#fff", fontSize: 22, fontWeight: "600", marginBottom: 10 }}>Pregătește-te!</Text>
-          <Text style={{ color: "#F97316", fontSize: 96, fontWeight: "700", lineHeight: 100 }}>{countdown}</Text>
-          <Text style={{ color: "#8A8FA8", fontSize: 13, marginTop: 20, textAlign: "center", paddingHorizontal: 32 }}>
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.75)",
+            zIndex: 30,
+          }}
+        >
+          <Text style={{ color: "#8A8FA8", fontSize: 15, marginBottom: 6 }}>
+            {exercise.name}
+          </Text>
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 22,
+              fontWeight: "600",
+              marginBottom: 10,
+            }}
+          >
+            Pregătește-te!
+          </Text>
+          <Text
+            style={{
+              color: "#F97316",
+              fontSize: 96,
+              fontWeight: "700",
+              lineHeight: 100,
+            }}
+          >
+            {countdown}
+          </Text>
+          <Text
+            style={{
+              color: "#8A8FA8",
+              fontSize: 13,
+              marginTop: 20,
+              textAlign: "center",
+              paddingHorizontal: 32,
+            }}
+          >
             📱 {exercise.cameraPosition}
           </Text>
         </View>
       )}
 
       {isReady && exercise.type === "timed" && formWarning && (
-        <View style={{
-          position: "absolute",
-          // safeTop asigură că nu intră sub bara de status/notch
-          top: safeTop + (workoutMode ? 72 : 72),
-          left: 16, right: 16,
-          backgroundColor: "rgba(239,68,68,0.92)",
-          borderRadius: 12, padding: 14,
-          zIndex: 20, alignItems: "center",
-          flexDirection: "row", gap: 8,
-        }}>
+        <View
+          style={{
+            position: "absolute",
+            // safeTop asigură că nu intră sub bara de status/notch
+            top: safeTop + (workoutMode ? 72 : 72),
+            left: 16,
+            right: 16,
+            backgroundColor: "rgba(239,68,68,0.92)",
+            borderRadius: 12,
+            padding: 14,
+            zIndex: 20,
+            alignItems: "center",
+            flexDirection: "row",
+            gap: 8,
+          }}
+        >
           <Text style={{ fontSize: 18 }}>⚠️</Text>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Corectează postura!</Text>
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+            Corectează postura!
+          </Text>
         </View>
       )}
 
       {!workoutMode && (
         <>
           {/* Exercise name — top left, respectă safeTop */}
-          <View style={{
-            position: "absolute",
-            top: safeTop,
-            left: 16,
-            backgroundColor: "rgba(247,248,250,0.9)",
-            borderRadius: 12,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            zIndex: 20,
-            borderWidth: 1,
-            borderColor: "rgba(255,255,255,0.9)",
-          }}>
+          <View
+            style={{
+              position: "absolute",
+              top: safeTop,
+              left: 16,
+              backgroundColor: "rgba(247,248,250,0.9)",
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              zIndex: 20,
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.9)",
+            }}
+          >
             <Text style={{ color: "#0F0F10", fontWeight: "700", fontSize: 14 }}>
               {exercise.name}
             </Text>
@@ -611,10 +734,12 @@ useEffect(() => {
               position: "absolute",
               top: safeTop,
               right: 16,
-              width: 36, height: 36,
+              width: 36,
+              height: 36,
               backgroundColor: "rgba(247,248,250,0.9)",
               borderRadius: 10,
-              alignItems: "center", justifyContent: "center",
+              alignItems: "center",
+              justifyContent: "center",
               zIndex: 100,
               borderWidth: 1,
               borderColor: "rgba(255,255,255,0.9)",
@@ -626,29 +751,40 @@ useEffect(() => {
           </TouchableOpacity>
 
           {isReady && (
-            <View style={{
-              position: "absolute",
-              top: safeTop + 52,   // sub butonul de exit
-              left: 0, right: 0,
-              alignItems: "center",
-              zIndex: 20,
-            }}>
-              <View style={{
-                backgroundColor: exercise.type === "timed" && plankActive.current
-                  ? "rgba(34,197,94,0.9)"
-                  : "rgba(247,248,250,0.9)",
-                paddingHorizontal: 24,
-                paddingVertical: 12,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.9)",
-              }}>
-                <Text style={{
-                  color: exercise.type === "timed" && plankActive.current ? "#fff" : "#0F0F10",
-                  fontWeight: "700",
-                  fontSize: 28,
-                  letterSpacing: -0.5,
-                }}>
+            <View
+              style={{
+                position: "absolute",
+                top: safeTop + 52, // sub butonul de exit
+                left: 0,
+                right: 0,
+                alignItems: "center",
+                zIndex: 20,
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor:
+                    exercise.type === "timed" && plankActive.current
+                      ? "rgba(34,197,94,0.9)"
+                      : "rgba(247,248,250,0.9)",
+                  paddingHorizontal: 24,
+                  paddingVertical: 12,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.9)",
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      exercise.type === "timed" && plankActive.current
+                        ? "#fff"
+                        : "#0F0F10",
+                    fontWeight: "700",
+                    fontSize: 28,
+                    letterSpacing: -0.5,
+                  }}
+                >
                   {exercise.type === "timed"
                     ? `⏱ ${formatTime(seconds)}`
                     : `${reps} reps`}
@@ -658,13 +794,28 @@ useEffect(() => {
           )}
 
           {isReady && formFeedback.length > 0 && (
-            <View style={{ position: "absolute", bottom: 40, left: 16, right: 16, zIndex: 20, gap: 8 }}>
+            <View
+              style={{
+                position: "absolute",
+                bottom: 40,
+                left: 16,
+                right: 16,
+                zIndex: 20,
+                gap: 8,
+              }}
+            >
               {formFeedback.map((msg, idx) => (
-                <View key={idx} style={{
-                  backgroundColor: "rgba(239,68,68,0.9)",
-                  borderRadius: 12, padding: 12,
-                  flexDirection: "row", alignItems: "center", gap: 8,
-                }}>
+                <View
+                  key={idx}
+                  style={{
+                    backgroundColor: "rgba(239,68,68,0.9)",
+                    borderRadius: 12,
+                    padding: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
                   <Text style={{ fontSize: 16 }}>⚠️</Text>
                   <Text
                     style={{
@@ -684,13 +835,28 @@ useEffect(() => {
       )}
 
       {workoutMode && isReady && formFeedback.length > 0 && (
-        <View style={{ position: "absolute", bottom: 100, left: 16, right: 16, zIndex: 20, gap: 6 }}>
+        <View
+          style={{
+            position: "absolute",
+            bottom: 100,
+            left: 16,
+            right: 16,
+            zIndex: 20,
+            gap: 6,
+          }}
+        >
           {formFeedback.map((msg, idx) => (
-            <View key={idx} style={{
-              backgroundColor: "rgba(239,68,68,0.9)",
-              borderRadius: 12, padding: 10,
-              flexDirection: "row", alignItems: "center", gap: 8,
-            }}>
+            <View
+              key={idx}
+              style={{
+                backgroundColor: "rgba(239,68,68,0.9)",
+                borderRadius: 12,
+                padding: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
               <Text style={{ fontSize: 14 }}>⚠️</Text>
               <Text
                 style={{

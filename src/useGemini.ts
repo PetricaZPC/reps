@@ -141,10 +141,12 @@ CAPACITĂȚILE TALE:
 
 REGULI:
 - Răspunde ÎNTOTDEAUNA în română
+- In pozele cu mancare ofera strict retete baza pe ceea ce se vede in poza, fara alte recomandari sau sfaturi. Daca nu se poate identifica mancarea, raspunde politicos ca nu poti oferi o reteta bazata pe poza.
 - Fii concis și practic, fără introduceri lungi
 - Estimează porțiile uzuale dacă nu sunt date (ex: "3 ouă" = 3 ouă mari ~180g)
 - NU spune niciodată că nu ai acces la internet sau că nu poți genera conținut
 - Dacă nu e legat de nutriție/fitness, explică politicos că ești specializat pe aceste domenii
+- Nu folosi deloc markdown în răspuns: interzis '*', '**', '***', '###' și orice titluri/liste markdown.
 
 FORMAT SPECIAL — doar când calculezi nutriție dintr-un aliment/masă, adaugă la SFÂRȘITUL răspunsului:
 NUTRITION_DATA:{"calories":0,"protein":0,"carbs":0,"fat":0,"vitamins":[],"minerals":[]}
@@ -164,8 +166,15 @@ export interface SmartResponse {
   };
 }
 
+function sanitizeAssistantText(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*+/g, "")
+    .trim();
+}
+
 function parseAssistantResponse(raw: string): SmartResponse {
-  const nutritionMatch = raw.match(/NUTRITION_DATA:(\{.*?\})/s);
+  const nutritionMatch = raw.match(/NUTRITION_DATA\s*:\s*(\{[\s\S]*?\})/i);
   let nutritionData: SmartResponse["nutritionData"] | undefined;
 
   if (nutritionMatch) {
@@ -182,7 +191,31 @@ function parseAssistantResponse(raw: string): SmartResponse {
     } catch {}
   }
 
-  const cleanText = raw.replace(/\nNUTRITION_DATA:\{.*?\}/s, "").trim();
+  if (!nutritionData) {
+    const fallbackMatch = raw.match(
+      /\{[\s\S]*?"calories"\s*:\s*[-\d.]+[\s\S]*?"protein"\s*:\s*[-\d.]+[\s\S]*?"carbs"\s*:\s*[-\d.]+[\s\S]*?"fat"\s*:\s*[-\d.]+[\s\S]*?\}/i,
+    );
+    if (fallbackMatch) {
+      try {
+        const parsed = JSON.parse(fallbackMatch[0]);
+        nutritionData = {
+          calories: Number(parsed.calories) || 0,
+          protein: Number(parsed.protein) || 0,
+          carbs: Number(parsed.carbs) || 0,
+          fat: Number(parsed.fat) || 0,
+          vitamins: Array.isArray(parsed.vitamins) ? parsed.vitamins : [],
+          minerals: Array.isArray(parsed.minerals) ? parsed.minerals : [],
+        };
+      } catch {}
+    }
+  }
+
+  const cleanText = sanitizeAssistantText(
+    raw
+      .replace(/\n?NUTRITION_DATA\s*:\s*\{[\s\S]*?\}/gi, "")
+      .replace(/```json[\s\S]*?```/gi, "")
+      .trim(),
+  );
   return { text: cleanText, nutritionData };
 }
 
