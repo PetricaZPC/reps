@@ -15,6 +15,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { auth, db } from "../firebase/firebaseConfig";
 import Camera from "../src/Camera";
 import { EXERCISES, ExerciseConfig, MuscleGroup } from "../src/exercises";
@@ -218,6 +219,7 @@ function GroupCard({
 // ─── Main ────────────────────────────────────────────────────
 export default function Workout() {
   const { width } = useWindowDimensions();
+  const navigation = useNavigation();
   const [screen, setScreen] = useState<Screen>("menu");
   const [selectedExercise, setSelectedExercise] =
     useState<ExerciseConfig | null>(null);
@@ -229,6 +231,13 @@ export default function Workout() {
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
   const [savedWorkouts, setSavedWorkouts] = useState<CustomWorkout[]>([]);
   const [nameInputFocused, setNameInputFocused] = useState(false);
+
+  useEffect(() => {
+    const inWorkout = screen === "preset_session" || (screen === "single" && selectedExercise);
+    navigation.setOptions({
+      tabBarStyle: inWorkout ? { display: "none" } : { display: "flex" },
+    });
+  }, [screen, selectedExercise, navigation]);
 
   useEffect(() => {
     loadCustomWorkouts();
