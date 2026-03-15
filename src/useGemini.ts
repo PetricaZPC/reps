@@ -179,6 +179,22 @@ function sanitizeAssistantText(text: string): string {
     .trim();
 }
 
+function roundToOneDecimal(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function limitDecimalsToOne(text: string): string {
+  return text.replace(
+    /\b(-?\d+)[.,](\d{2,})\b/g,
+    (_match, intPart: string, fracPart: string) => {
+      const num = Number(`${intPart}.${fracPart}`);
+      if (Number.isNaN(num)) return `${intPart}.${fracPart}`;
+      const rounded = roundToOneDecimal(num).toString().split(".");
+      return rounded[1] ? `${rounded[0]},${rounded[1]}` : rounded[0];
+    },
+  );
+}
+
 function appendPortionPrompt(text: string): string {
   const prompt = "Ai mâncat toată porția? Confirmă mai jos.";
   if (text.trim().endsWith(prompt)) return text;
@@ -194,10 +210,10 @@ function parseAssistantResponse(raw: string): SmartResponse {
     try {
       const parsed = JSON.parse(nutritionMatch[1]);
       nutritionData = {
-        calories: Number(parsed.calories) || 0,
-        protein: Number(parsed.protein) || 0,
-        carbs: Number(parsed.carbs) || 0,
-        fat: Number(parsed.fat) || 0,
+        calories: roundToOneDecimal(Number(parsed.calories) || 0),
+        protein: roundToOneDecimal(Number(parsed.protein) || 0),
+        carbs: roundToOneDecimal(Number(parsed.carbs) || 0),
+        fat: roundToOneDecimal(Number(parsed.fat) || 0),
         vitamins: Array.isArray(parsed.vitamins) ? parsed.vitamins : [],
         minerals: Array.isArray(parsed.minerals) ? parsed.minerals : [],
       };
@@ -212,10 +228,10 @@ function parseAssistantResponse(raw: string): SmartResponse {
       try {
         const parsed = JSON.parse(fallbackMatch[0]);
         nutritionData = {
-          calories: Number(parsed.calories) || 0,
-          protein: Number(parsed.protein) || 0,
-          carbs: Number(parsed.carbs) || 0,
-          fat: Number(parsed.fat) || 0,
+          calories: roundToOneDecimal(Number(parsed.calories) || 0),
+          protein: roundToOneDecimal(Number(parsed.protein) || 0),
+          carbs: roundToOneDecimal(Number(parsed.carbs) || 0),
+          fat: roundToOneDecimal(Number(parsed.fat) || 0),
           vitamins: Array.isArray(parsed.vitamins) ? parsed.vitamins : [],
           minerals: Array.isArray(parsed.minerals) ? parsed.minerals : [],
         };
@@ -230,9 +246,11 @@ function parseAssistantResponse(raw: string): SmartResponse {
       .trim(),
   );
 
+  const normalizedText = limitDecimalsToOne(cleanText);
+
   const textWithPrompt = nutritionData
-    ? appendPortionPrompt(cleanText)
-    : cleanText;
+    ? appendPortionPrompt(normalizedText)
+    : normalizedText;
 
   return { text: textWithPrompt, nutritionData };
 }
