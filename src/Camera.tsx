@@ -6,9 +6,6 @@ import {
   Animated,
   Dimensions,
   Easing,
-  Platform,
-  Pressable,
-  StatusBar,
   Text,
   TouchableOpacity,
   View,
@@ -17,14 +14,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ExerciseConfig, calculateAngle, landmarkIndexMap } from "./exercises";
 import SkeletonOverlay from "./skeletonOverlay";
 
-// ─── Device rotation hook (shared cu WorkoutSession) ──────────
+// ─── Device rotation hook ─────────────────────────────────────
 type DeviceOrientation = "portrait" | "landscape-left" | "landscape-right";
 function useDeviceRotation() {
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const [orientation, setOrientation] = useState<DeviceOrientation>("portrait");
   const currentOrientRef = useRef<DeviceOrientation>("portrait");
   useEffect(() => {
-    Accelerometer.setUpdateInterval(150);
+    Accelerometer.setUpdateInterval(300);
     const sub = Accelerometer.addListener(({ x, y }) => {
       let next: DeviceOrientation = "portrait";
       if (Math.abs(y) > 0.7) next = "portrait";
@@ -34,9 +31,11 @@ function useDeviceRotation() {
       if (next !== currentOrientRef.current) {
         currentOrientRef.current = next;
         setOrientation(next);
-        const toValue = next === "portrait" ? 0 : next === "landscape-left" ? 90 : -90;
+        const toValue =
+          next === "portrait" ? 0 : next === "landscape-left" ? 90 : -90;
         Animated.timing(rotateAnim, {
-          toValue, duration: 280,
+          toValue,
+          duration: 280,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }).start();
@@ -53,28 +52,42 @@ function useDeviceRotation() {
 }
 
 // ─── RotatedView ──────────────────────────────────────────────
+// MATEMATICA CORECTĂ:
+// Ecranul fizic e mereu W×H (portret lock), W < H.
+// Vrem ca conținutul să pară rotit 90° fără ca aplicația să schimbe orientarea.
+// Un View de dimensiuni H×W, rotit vizual 90°, va ocupa exact W×H pe ecran.
+// Ca centrul View-ului rotit să coincidă cu centrul ecranului:
+//   top  = (H - W) / 2   (View-ul e mai înalt decât ecranul, îl coborâm)
+//   left = (W - H) / 2   (valoare negativă — View-ul e mai lat decât ecranul)
 function RotatedView({
-  rotate, isLandscape, children,
+  rotate,
+  isLandscape,
+  children,
 }: {
   rotate: Animated.AnimatedInterpolation<string>;
   isLandscape: boolean;
   children: React.ReactNode;
 }) {
   const screen = Dimensions.get("screen");
-  const W = Math.min(screen.width, screen.height);
-  const H = Math.max(screen.width, screen.height);
+  const W = Math.min(screen.width, screen.height); // latura mică = lățimea portret
+  const H = Math.max(screen.width, screen.height); // latura mare = înălțimea portret
+
   return (
-    <View style={{ position: "absolute", top: 0, left: 0, width: W, height: H }}>
-      <Animated.View style={{
-        position: "absolute",
-        width: isLandscape ? H : W,
-        height: isLandscape ? W : H,
-        top: isLandscape ? (H - W) / 2 : 0,
-        left: isLandscape ? (W - H) / 2 : 0,
-        transform: [{ rotate }],
-        justifyContent: "center",
-        alignItems: "center",
-      }}>
+    <View
+      style={{ position: "absolute", top: 0, left: 0, width: W, height: H }}
+    >
+      <Animated.View
+        style={{
+          position: "absolute",
+          width: isLandscape ? H : W,
+          height: isLandscape ? W : H,
+          top: isLandscape ? (H - W) / 2 : 0,
+          left: isLandscape ? (W - H) / 2 : 0,
+          transform: [{ rotate }],
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
         {children}
       </Animated.View>
     </View>
@@ -83,29 +96,35 @@ function RotatedView({
 
 const { width, height } = Dimensions.get("window");
 
+// ─── Props ────────────────────────────────────────────────────
 interface CameraProps {
   exercise: ExerciseConfig;
   onExit: () => void;
   onRepsUpdate?: (reps: number) => void;
   onSecondsUpdate?: (seconds: number) => void;
+  onSecondaryAction?: () => void;
+  secondaryLabel?: string;
   workoutMode?: boolean;
   targetReps?: number;
   setNumber?: number;
   totalSets?: number;
   uiRotate?: Animated.AnimatedInterpolation<string>;
   isLandscape?: boolean;
+  onFormFeedback?: (msgs: string[]) => void;
 }
 
 interface ErrorBoundaryProps {
   fallback: React.ReactNode;
   children: React.ReactNode;
 }
-
 interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class MediapipeErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class MediapipeErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -122,23 +141,34 @@ class MediapipeErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBo
   }
 }
 
+// ─── Main ─────────────────────────────────────────────────────
 export default function Camera({
   exercise,
   onExit,
   onRepsUpdate,
   onSecondsUpdate,
+  onSecondaryAction,
+  secondaryLabel,
   workoutMode = false,
   targetReps,
   setNumber,
   totalSets,
   uiRotate,
   isLandscape: isLandscapeExternal,
+  onFormFeedback,
 }: CameraProps) {
-  // ── Safe area ──────────────────────────────────────────────
-  // useSafeAreaInsets() returnează valorile corecte pe orice device/OS
   const insets = useSafeAreaInsets();
-  const safeTop = insets.top + 8;
-  const { rotate: singleRotate, isLandscape: singleIsLandscape } = useDeviceRotation();
+  const safeTop = insets.top + 10;
+
+  // Single mode are rotație proprie din accelerometru
+  // Workout mode primește rotația din WorkoutSession (uiRotate + isLandscapeExternal)
+  const { rotate: singleRotate, isLandscape: singleIsLandscape } =
+    useDeviceRotation();
+  const activeRotate = workoutMode && uiRotate ? uiRotate : singleRotate;
+  const activeIsLandscape =
+    workoutMode && typeof isLandscapeExternal === "boolean"
+      ? isLandscapeExternal
+      : singleIsLandscape;
 
   const [permission, requestPermission] = useCameraPermissions();
   const [reps, setReps] = useState(0);
@@ -161,10 +191,7 @@ export default function Camera({
   const lastFeedbackRef = useRef<string>("");
   const formViolationTime = useRef<Record<string, number>>({});
   const countdownRef = useRef<any>(null);
-  // Detectare mișcări haotice — stocăm ultimul unghi valid
   const lastAngleRef = useRef<number | null>(null);
-
-
 
   useEffect(() => {
     setReps(0);
@@ -180,12 +207,10 @@ export default function Camera({
     plankActive.current = false;
     lastFeedbackRef.current = "";
     formViolationTime.current = {};
+    lastAngleRef.current = null;
     if (plankInterval.current) clearInterval(plankInterval.current);
     if (countdownRef.current) clearInterval(countdownRef.current);
     isReadyRef.current = false;
-
-
-    lastAngleRef.current = null;
     if (workoutMode) startCountdown();
   }, [exercise.name, workoutMode]);
 
@@ -204,9 +229,30 @@ export default function Camera({
     }, 1000);
   };
 
+  const resetSession = () => {
+    if (plankInterval.current) clearInterval(plankInterval.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setReps(0);
+    setSeconds(0);
+    setStarted(false);
+    setIsReady(false);
+    setCountdown(5);
+    setFormWarning(false);
+    setFormFeedback([]);
+    setAffectedLandmarks([]);
+    upPosRef.current = false;
+    repsRef.current = 0;
+    isReadyRef.current = false;
+    plankActive.current = false;
+    lastFeedbackRef.current = "";
+    formViolationTime.current = {};
+    lastAngleRef.current = null;
+    onRepsUpdate?.(0);
+    onSecondsUpdate?.(0);
+  };
+
   const handleLandmark = (data: any) => {
     const now = Date.now();
-
     let parsed: any;
     try {
       parsed = typeof data === "string" ? JSON.parse(data) : data;
@@ -215,12 +261,14 @@ export default function Camera({
     }
 
     let landmarkArray: any[] | null = null;
-    if (Array.isArray(parsed.worldLandmarks) && parsed.worldLandmarks.length > 0) {
+    if (
+      Array.isArray(parsed.worldLandmarks) &&
+      parsed.worldLandmarks.length > 0
+    ) {
       landmarkArray = parsed.worldLandmarks;
     } else if (Array.isArray(parsed.landmarks) && parsed.landmarks.length > 0) {
       landmarkArray = parsed.landmarks;
     }
-
     if (!landmarkArray || landmarkArray.length === 0) return;
 
     const landmarks2D =
@@ -235,7 +283,6 @@ export default function Camera({
     Object.entries(landmarkIndexMap).forEach(([name, idx]) => {
       landmarkObj[name] = landmarkArray![idx];
     });
-
     const landmarkObj2D: Record<string, any> = {};
     if (landmarks2D) {
       Object.entries(landmarkIndexMap).forEach(([name, idx]) => {
@@ -243,49 +290,39 @@ export default function Camera({
       });
     }
 
-    // ── Visibility check ─────────────────────────────────────
-    // Dacă landmarks-urile exercițiului nu sunt vizibile (ești în afara cadrului
-    // sau te miști haotic spre cameră), resetăm upPosRef ca să nu se numere
-    // o rep falsă când reintri în cadru
-    if (landmarks2D) {
-      const points2D = exercise.landmarks.map((name: string) => {
-        const idx = landmarkIndexMap[name];
-        return landmarks2D[idx];
-      });
-      const allVisible = points2D.every(
-        (p: any) => p && typeof p.x === "number" && (p.visibility ?? 0) >= 0.5
-      );
-      if (!allVisible) {
-        upPosRef.current = false; // reset stare — nu număra la revenire
-        return;
-      }
-    }
-
     const points = exercise.landmarks.map((name: string) => landmarkObj[name]);
-    if (!points.length || !points.every((p: any) => p && typeof p.x === "number")) return;
+    if (
+      !points.length ||
+      !points.every((p: any) => p && typeof p.x === "number")
+    )
+      return;
 
     const angle = calculateAngle(points[0], points[1], points[2]);
 
+    // ── Form rules — ÎNAINTE de visibility check ──────────────
+    // Rulează mereu ca să coloreze scheletul roșu și să afișeze mesajul
     const violations: string[] = [];
     const allAffected: string[] = [];
-
     if (landmarks2D) {
       exercise.formRules.forEach((rule) => {
-        const rulePoints = rule.landmarks.map((name: string) => landmarkObj2D[name]);
+        const rulePoints = rule.landmarks.map(
+          (name: string) => landmarkObj2D[name],
+        );
         if (!rulePoints.every((p: any) => p && typeof p.x === "number")) return;
-
-        const ruleAngle = calculateAngle(rulePoints[0], rulePoints[1], rulePoints[2]);
-
+        const ruleAngle = calculateAngle(
+          rulePoints[0],
+          rulePoints[1],
+          rulePoints[2],
+        );
         let violated = false;
-        if (rule.minAngle !== undefined && ruleAngle < rule.minAngle) violated = true;
-        if (rule.maxAngle !== undefined && ruleAngle > rule.maxAngle) violated = true;
-
+        if (rule.minAngle !== undefined && ruleAngle < rule.minAngle)
+          violated = true;
+        if (rule.maxAngle !== undefined && ruleAngle > rule.maxAngle)
+          violated = true;
         if (violated) {
-          if (!formViolationTime.current[rule.message]) {
+          if (!formViolationTime.current[rule.message])
             formViolationTime.current[rule.message] = now;
-          }
-          const duration = now - formViolationTime.current[rule.message];
-          if (duration > 800) {
+          if (now - formViolationTime.current[rule.message] > 800) {
             violations.push(rule.message);
             allAffected.push(...rule.affectedLandmarks);
           }
@@ -294,12 +331,28 @@ export default function Camera({
         }
       });
     }
-
     const newFeedback = violations.join("|");
     if (newFeedback !== lastFeedbackRef.current) {
       lastFeedbackRef.current = newFeedback;
       setFormFeedback(violations);
-      setAffectedLandmarks(allAffected);
+      setAffectedLandmarks(violations.length > 0 ? allAffected : []);
+      // Trimitem feedback-ul și către WorkoutSession dacă e workout mode
+      onFormFeedback?.(violations);
+    }
+
+    // ── Visibility check — doar pentru numărare ───────────────
+    if (landmarks2D) {
+      const points2D = exercise.landmarks.map((name: string) => {
+        const idx = landmarkIndexMap[name];
+        return landmarks2D[idx];
+      });
+      const allVisible = points2D.every(
+        (p: any) => p && typeof p.x === "number" && (p.visibility ?? 0) >= 0.5,
+      );
+      if (!allVisible) {
+        upPosRef.current = false;
+        return;
+      }
     }
 
     if (now - lastLogTime.current > 1000) {
@@ -307,13 +360,15 @@ export default function Camera({
       console.log("EXERCISE:", exercise.name, "| angle:", angle.toFixed(1));
     }
 
+    // ── Timed (plank etc.) ────────────────────────────────────
     if (exercise.type === "timed") {
-      const mainPoints = exercise.landmarks.map((name: string) => landmarkObj[name]);
+      const mainPoints = exercise.landmarks.map(
+        (name: string) => landmarkObj[name],
+      );
       const pointsVisible = mainPoints.every(
         (p: any) => p && typeof p.x === "number" && (p.visibility ?? 1) > 0.3,
       );
       const goodForm = pointsVisible && angle >= exercise.minAngle;
-
       if (goodForm !== plankActive.current) {
         plankActive.current = goodForm;
         setFormWarning(!goodForm && pointsVisible);
@@ -335,25 +390,21 @@ export default function Camera({
     if (violations.length > 0) return;
 
     // ── Spike detection — mișcări haotice ────────────────────
-    // Dacă unghiul sare cu mai mult de 40° față de frame-ul anterior,
-    // e o mișcare bruscă/haotică (nu un exercițiu real).
-    // Resetăm starea și nu numărăm.
-    const SPIKE_THRESHOLD = 80;
+    const SPIKE_THRESHOLD = 40;
     if (lastAngleRef.current !== null) {
       const delta = Math.abs(angle - lastAngleRef.current);
       if (delta > SPIKE_THRESHOLD) {
-        upPosRef.current = false; // anulăm faza curentă
+        upPosRef.current = false;
         lastAngleRef.current = angle;
-        return; // ignorăm acest frame
+        return;
       }
     }
     lastAngleRef.current = angle;
 
-    // Logică simplă din versiunea originală care funcționa
+    // ── Rep counting ──────────────────────────────────────────
     if (exercise.countOn === "up") {
-      if (angle < exercise.minAngle && !upPosRef.current) {
+      if (angle < exercise.minAngle && !upPosRef.current)
         upPosRef.current = true;
-      }
       if (angle > exercise.maxAngle && upPosRef.current) {
         if (now - lastRepTime.current > 500) {
           upPosRef.current = false;
@@ -365,9 +416,8 @@ export default function Camera({
         }
       }
     } else {
-      if (angle > exercise.maxAngle && !upPosRef.current) {
+      if (angle > exercise.maxAngle && !upPosRef.current)
         upPosRef.current = true;
-      }
       if (angle < exercise.minAngle && upPosRef.current) {
         if (now - lastRepTime.current > 500) {
           upPosRef.current = false;
@@ -381,19 +431,55 @@ export default function Camera({
     }
   };
 
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, "0")}`;
-  };
+  const fmt = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const plankOn = exercise.type === "timed" && plankActive.current;
+  const counterValue = exercise.type === "timed" ? fmt(seconds) : String(reps);
+  const counterTarget = targetReps
+    ? exercise.type === "timed"
+      ? fmt(targetReps)
+      : String(targetReps)
+    : null;
+  const hudBottom = Math.max(insets.bottom + 16, 32);
+  const secondaryText =
+    secondaryLabel ?? (workoutMode ? "Sari setul" : "Resetează");
+  const secondaryHandler =
+    onSecondaryAction ?? (workoutMode ? undefined : resetSession);
 
-  // ── Permission states ────────────────────────────────────
+  // ── Fallback ──────────────────────────────────────────────
   const cameraFallback = (
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "#000", paddingHorizontal: 24 }}>
-      <Text style={{ color: "#fff", fontSize: 18, textAlign: "center", marginBottom: 12 }}>
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#000",
+        paddingHorizontal: 24,
+      }}
+    >
+      <Text
+        style={{
+          color: "#fff",
+          fontSize: 18,
+          textAlign: "center",
+          marginBottom: 12,
+        }}
+      >
         Camera tracking is not available on this device.
       </Text>
-      <TouchableOpacity onPress={onExit} style={{ backgroundColor: "#4F6EF7", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+      <TouchableOpacity
+        onPress={onExit}
+        style={{
+          backgroundColor: "#4F6EF7",
+          paddingHorizontal: 24,
+          paddingVertical: 12,
+          borderRadius: 12,
+        }}
+      >
         <Text style={{ color: "#fff", fontWeight: "600" }}>Înapoi</Text>
       </TouchableOpacity>
     </View>
@@ -401,26 +487,65 @@ export default function Camera({
 
   if (!permission) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
-        <Text style={{ color: "#fff", fontSize: 16 }}>Se încarcă camera...</Text>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#000",
+        }}
+      >
+        <Text style={{ color: "#fff", fontSize: 16 }}>
+          Se încarcă camera...
+        </Text>
       </View>
     );
   }
-
   if (!permission.granted) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000", paddingHorizontal: 32 }}>
-        <Text style={{ color: "#fff", fontSize: 18, marginBottom: 8, fontWeight: "700", textAlign: "center" }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#000",
+          paddingHorizontal: 32,
+        }}
+      >
+        <Text
+          style={{
+            color: "#fff",
+            fontSize: 18,
+            marginBottom: 8,
+            fontWeight: "700",
+            textAlign: "center",
+          }}
+        >
           Permisiune cameră necesară
         </Text>
-        <Text style={{ color: "#8A8FA8", fontSize: 14, textAlign: "center", marginBottom: 28, lineHeight: 20 }}>
+        <Text
+          style={{
+            color: "#8A8FA8",
+            fontSize: 14,
+            textAlign: "center",
+            marginBottom: 28,
+            lineHeight: 20,
+          }}
+        >
           Aplicația are nevoie de acces la cameră pentru a detecta mișcările.
         </Text>
         <TouchableOpacity
           onPress={requestPermission}
-          style={{ backgroundColor: "#4F6EF7", paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14 }}
+          style={{
+            backgroundColor: "#4F6EF7",
+            paddingHorizontal: 32,
+            paddingVertical: 14,
+            borderRadius: 14,
+          }}
         >
-          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Acordă permisiunea</Text>
+          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
+            Acordă permisiunea
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -428,6 +553,7 @@ export default function Camera({
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
+      {/* ── Camera feed ── */}
       {RNMediapipe ? (
         <MediapipeErrorBoundary fallback={cameraFallback}>
           <RNMediapipe
@@ -450,6 +576,7 @@ export default function Camera({
         cameraFallback
       )}
 
+      {/* ── Skeleton overlay ── */}
       {skeletonLandmarks.length > 0 && (
         <SkeletonOverlay
           landmarks={skeletonLandmarks}
@@ -457,195 +584,356 @@ export default function Camera({
         />
       )}
 
-      {/* ── Start screen (single mode) — se rotește cu telefonul ── */}
+      {/* ── Start screen — single mode, se rotește ── */}
       {!workoutMode && !started && (
         <RotatedView rotate={singleRotate} isLandscape={singleIsLandscape}>
-          <View style={{
-            flex: 1, width: "100%",
-            justifyContent: "center", alignItems: "center",
-            backgroundColor: "rgba(0,0,0,0.85)",
-            paddingHorizontal: 32,
-          }}>
-            {/* Iconița exercițiului */}
-            <View style={{
-              width: 72, height: 72, borderRadius: 22,
-              backgroundColor: "rgba(79,110,247,0.2)",
-              alignItems: "center", justifyContent: "center",
-              marginBottom: 16,
-            }}>
+          <View
+            style={{
+              flex: 1,
+              width: "100%",
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: "rgba(0,0,0,0.85)",
+              paddingHorizontal: 32,
+            }}
+          >
+            <View
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 22,
+                backgroundColor: "rgba(79,110,247,0.2)",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 16,
+              }}
+            >
               <Text style={{ fontSize: 36 }}>🏋️</Text>
             </View>
-
-            <Text style={{ color: "#fff", fontSize: 24, fontWeight: "700", marginBottom: 8, textAlign: "center", letterSpacing: -0.5 }}>
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 24,
+                fontWeight: "700",
+                marginBottom: 8,
+                textAlign: "center",
+                letterSpacing: -0.5,
+              }}
+            >
               {exercise.name}
             </Text>
-            <Text style={{ color: "#8A8FA8", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 19 }}>
+            <Text
+              style={{
+                color: "#8A8FA8",
+                fontSize: 13,
+                textAlign: "center",
+                marginBottom: 20,
+                lineHeight: 19,
+              }}
+            >
               {exercise.description}
             </Text>
-
-            {/* Camera hint */}
-            <View style={{
-              flexDirection: "row", alignItems: "center", gap: 8,
-              backgroundColor: "rgba(249,115,22,0.15)",
-              borderRadius: 12, padding: 12, paddingHorizontal: 16,
-              marginBottom: 32,
-            }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                backgroundColor: "rgba(249,115,22,0.15)",
+                borderRadius: 12,
+                padding: 12,
+                paddingHorizontal: 16,
+                marginBottom: 32,
+              }}
+            >
               <Text style={{ fontSize: 14 }}>📱</Text>
-              <Text style={{ color: "#F97316", fontSize: 13, fontWeight: "500", flex: 1 }}>
+              <Text
+                style={{
+                  color: "#F97316",
+                  fontSize: 13,
+                  fontWeight: "500",
+                  flex: 1,
+                }}
+              >
                 {exercise.cameraPosition}
               </Text>
             </View>
-
-            {/* Butoane */}
             <TouchableOpacity
               onPress={startCountdown}
               style={{
                 backgroundColor: "#22C55E",
-                paddingHorizontal: 52, paddingVertical: 15,
-                borderRadius: 16, marginBottom: 12,
+                paddingHorizontal: 52,
+                paddingVertical: 15,
+                borderRadius: 16,
+                marginBottom: 12,
                 shadowColor: "#22C55E",
                 shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+                shadowOpacity: 0.3,
+                shadowRadius: 12,
+                elevation: 6,
               }}
             >
-              <Text style={{ color: "#fff", fontSize: 17, fontWeight: "700" }}>START</Text>
+              <Text style={{ color: "#fff", fontSize: 17, fontWeight: "700" }}>
+                START
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={onExit} style={{ paddingHorizontal: 40, paddingVertical: 10 }}>
+            <TouchableOpacity
+              onPress={onExit}
+              style={{ paddingHorizontal: 40, paddingVertical: 10 }}
+            >
               <Text style={{ color: "#8A8FA8", fontSize: 14 }}>Înapoi</Text>
             </TouchableOpacity>
           </View>
         </RotatedView>
       )}
 
-      {/* ── Countdown — se rotește cu telefonul ── */}
+      {/* ── Countdown — se rotește ── */}
       {started && !isReady && (
-        <RotatedView rotate={singleRotate} isLandscape={singleIsLandscape}>
-          <View style={{
-            flex: 1, width: "100%",
-            justifyContent: "center", alignItems: "center",
-            backgroundColor: "rgba(0,0,0,0.8)",
-          }}>
-            <Text style={{ color: "#8A8FA8", fontSize: 14, marginBottom: 8 }}>{exercise.name}</Text>
-            <Text style={{ color: "#fff", fontSize: 20, fontWeight: "600", marginBottom: 12 }}>Pregătește-te!</Text>
-            <Text style={{ color: "#F97316", fontSize: 96, fontWeight: "700", lineHeight: 104 }}>{countdown}</Text>
-            <Text style={{ color: "#8A8FA8", fontSize: 12, marginTop: 20, textAlign: "center", paddingHorizontal: 32 }}>
+        <RotatedView rotate={activeRotate} isLandscape={activeIsLandscape}>
+          <View
+            style={{
+              flex: 1,
+              width: "100%",
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: "rgba(0,0,0,0.8)",
+            }}
+          >
+            <Text style={{ color: "#8A8FA8", fontSize: 14, marginBottom: 8 }}>
+              {exercise.name}
+            </Text>
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 20,
+                fontWeight: "600",
+                marginBottom: 12,
+              }}
+            >
+              Pregătește-te!
+            </Text>
+            <Text
+              style={{
+                color: "#F97316",
+                fontSize: 96,
+                fontWeight: "700",
+                lineHeight: 104,
+              }}
+            >
+              {countdown}
+            </Text>
+            <Text
+              style={{
+                color: "#8A8FA8",
+                fontSize: 12,
+                marginTop: 20,
+                textAlign: "center",
+                paddingHorizontal: 32,
+              }}
+            >
               📱 {exercise.cameraPosition}
             </Text>
           </View>
         </RotatedView>
       )}
 
-      {/* ── Form warning (timed exercises) ── */}
-      {isReady && exercise.type === "timed" && formWarning && (
-        <View style={{
-          position: "absolute",
-          // safeTop asigură că nu intră sub bara de status/notch
-          top: safeTop + (workoutMode ? 72 : 72),
-          left: 16, right: 16,
-          backgroundColor: "rgba(239,68,68,0.92)",
-          borderRadius: 12, padding: 14,
-          zIndex: 20, alignItems: "center",
-          flexDirection: "row", gap: 8,
-        }}>
-          <Text style={{ fontSize: 18 }}>⚠️</Text>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Corectează postura!</Text>
-        </View>
-      )}
-
-      {/* ── Normal mode UI — se rotește cu accelerometrul ── */}
-      {!workoutMode && (
-        <RotatedView rotate={singleRotate} isLandscape={singleIsLandscape}>
-          {/* Layout: flex column, spațiu sus pentru HUD, spațiu jos pentru feedback */}
-          <View style={{
-            flex: 1, width: "100%",
-            paddingTop: safeTop,
-            paddingHorizontal: 16,
-            paddingBottom: Math.max(insets.bottom + 16, 32),
-          }}>
-            {/* Rândul de sus: nume exercițiu + buton X */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <View style={{
-                flex: 1,
-                backgroundColor: "rgba(247,248,250,0.9)",
-                borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
-                borderWidth: 1, borderColor: "rgba(255,255,255,0.9)",
-              }}>
-                <Text style={{ color: "#0F0F10", fontWeight: "700", fontSize: 14 }}>
+      {/* ════════════════════════════════════════════════════════
+          HUD ACTIV — același layout pentru AMBELE moduri
+          Se rotește cu telefonul via RotatedView
+          ════════════════════════════════════════════════════════ */}
+      {started && isReady && (
+        <RotatedView rotate={activeRotate} isLandscape={activeIsLandscape}>
+          <View
+            style={{
+              flex: 1,
+              width: "100%",
+              paddingTop: safeTop,
+              paddingBottom: hudBottom,
+              paddingLeft: Math.max(insets.left + 10, 10),
+              paddingRight: Math.max(insets.right + 10, 10),
+            }}
+          >
+            {/* ── Top: info box + counter — exact ca WorkoutSession ── */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "flex-end",
+                alignItems: "flex-start",
+                gap: 8,
+              }}
+            >
+              {/* Info box */}
+              <View
+                style={{
+                  backgroundColor: "rgba(247,248,250,0.88)",
+                  borderRadius: 12,
+                  padding: 10,
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.9)",
+                  maxWidth: 160,
+                  flexShrink: 1,
+                }}
+              >
+                <Text style={{ fontSize: 10, color: "#8A8FA8" }}>
+                  {workoutMode && setNumber && totalSets
+                    ? `${setNumber}/${totalSets} · seturi`
+                    : exercise.muscleGroup}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: "#0F0F10",
+                    marginTop: 1,
+                  }}
+                >
                   {exercise.name}
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={onExit}
+              {/* Counter box */}
+              <View
                 style={{
-                  width: 36, height: 36,
-                  backgroundColor: "rgba(247,248,250,0.9)",
-                  borderRadius: 10,
-                  alignItems: "center", justifyContent: "center",
-                  borderWidth: 1, borderColor: "rgba(255,255,255,0.9)",
+                  backgroundColor: plankOn
+                    ? "rgba(34,197,94,0.9)"
+                    : "rgba(247,248,250,0.88)",
+                  borderRadius: 12,
+                  padding: 10,
+                  alignItems: "center",
+                  minWidth: 68,
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.9)",
                 }}
               >
-                <Text style={{ color: "#0F0F10", fontWeight: "700", fontSize: 16 }}>✕</Text>
-              </TouchableOpacity>
+                <Text
+                  style={{
+                    fontSize: 22,
+                    fontWeight: "700",
+                    color: plankOn ? "#fff" : "#F97316",
+                    letterSpacing: -0.5,
+                  }}
+                >
+                  {counterValue}
+                </Text>
+                {counterTarget !== null && (
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      marginTop: 1,
+                      color: plankOn ? "rgba(255,255,255,0.75)" : "#8A8FA8",
+                    }}
+                  >
+                    / {counterTarget}
+                  </Text>
+                )}
+              </View>
             </View>
 
-            {/* Counter — sub HUD */}
-            {isReady && (
-              <View style={{ alignItems: "center", marginTop: 10 }}>
-                <View style={{
-                  backgroundColor: exercise.type === "timed" && plankActive.current
-                    ? "rgba(34,197,94,0.9)"
-                    : "rgba(247,248,250,0.9)",
-                  paddingHorizontal: 24, paddingVertical: 12,
-                  borderRadius: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.9)",
-                }}>
-                  <Text style={{
-                    color: exercise.type === "timed" && plankActive.current ? "#fff" : "#0F0F10",
-                    fontWeight: "700", fontSize: 28, letterSpacing: -0.5,
-                  }}>
-                    {exercise.type === "timed"
-                      ? `⏱ ${formatTime(seconds)}`
-                      : `${reps} reps`}
-                  </Text>
-                </View>
+            {/* Form warning (timed) */}
+            {exercise.type === "timed" && formWarning && (
+              <View
+                style={{
+                  marginTop: 10,
+                  backgroundColor: "rgba(239,68,68,0.92)",
+                  borderRadius: 12,
+                  padding: 12,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>⚠️</Text>
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontWeight: "700",
+                    fontSize: 14,
+                    flex: 1,
+                  }}
+                >
+                  Corectează postura!
+                </Text>
               </View>
             )}
 
             {/* Spacer */}
             <View style={{ flex: 1 }} />
 
-            {/* Form feedback — jos */}
-            {isReady && formFeedback.length > 0 && (
-              <View style={{ gap: 8 }}>
+            {/* ── Form feedback — deasupra butoanelor, rotit ── */}
+            {formFeedback.length > 0 && (
+              <View style={{ gap: 6, marginBottom: 10 }}>
                 {formFeedback.map((msg, idx) => (
-                  <View key={idx} style={{
-                    backgroundColor: "rgba(239,68,68,0.9)",
-                    borderRadius: 12, padding: 12,
-                    flexDirection: "row", alignItems: "center", gap: 8,
-                  }}>
-                    <Text style={{ fontSize: 16 }}>⚠️</Text>
-                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14, flex: 1 }}>{msg}</Text>
+                  <View
+                    key={idx}
+                    style={{
+                      backgroundColor: "rgba(239,68,68,0.9)",
+                      borderRadius: 12,
+                      padding: 10,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 14 }}>⚠️</Text>
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontWeight: "700",
+                        fontSize: 13,
+                        flex: 1,
+                      }}
+                    >
+                      {msg}
+                    </Text>
                   </View>
                 ))}
               </View>
             )}
+
+            {/* ── Butoane jos — identice WorkoutSession ── */}
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity
+                onPress={onExit}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: "rgba(239,68,68,0.85)",
+                  borderRadius: 12,
+                  paddingHorizontal: 18,
+                  paddingVertical: 13,
+                }}
+              >
+                <Text
+                  style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}
+                >
+                  Oprește
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={secondaryHandler}
+                disabled={!secondaryHandler}
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  backgroundColor: "rgba(247,248,250,0.88)",
+                  borderRadius: 12,
+                  paddingVertical: workoutMode ? 10 : 13,
+                  paddingHorizontal: workoutMode ? 12 : undefined,
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.9)",
+                }}
+              >
+                <Text
+                  style={{ color: "#0F0F10", fontWeight: "700", fontSize: 14 }}
+                >
+                  {secondaryText}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </RotatedView>
-      )}
-
-      {/* ── Workout mode form feedback ── */}
-      {workoutMode && isReady && formFeedback.length > 0 && (
-        <View style={{ position: "absolute", bottom: 100, left: 16, right: 16, zIndex: 20, gap: 6 }}>
-          {formFeedback.map((msg, idx) => (
-            <View key={idx} style={{
-              backgroundColor: "rgba(239,68,68,0.9)",
-              borderRadius: 12, padding: 10,
-              flexDirection: "row", alignItems: "center", gap: 8,
-            }}>
-              <Text style={{ fontSize: 14 }}>⚠️</Text>
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13, flex: 1 }}>{msg}</Text>
-            </View>
-          ))}
-        </View>
       )}
     </View>
   );

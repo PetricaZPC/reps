@@ -582,10 +582,6 @@ export default function WorkoutSession({
   }
 
   // ── Camera (exercițiu activ) ───────────────────────────────
-  // HUD-ul pe cameră se rotește și el cu accelerometrul
-  const hudTopOffset = insets.top + 10;
-  const hudBottomOffset = Math.max(insets.bottom + 16, 32);
-
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
       <Camera
@@ -593,6 +589,8 @@ export default function WorkoutSession({
         onExit={onExit}
         onRepsUpdate={handleRepsUpdate}
         onSecondsUpdate={handleSecondsUpdate}
+        onSecondaryAction={skipCurrentSet}
+        secondaryLabel="Sari setul"
         workoutMode
         targetReps={target}
         setNumber={setIndex + 1}
@@ -607,65 +605,6 @@ export default function WorkoutSession({
           style={[s.cameraProgressFill, { width: `${progressPct}%` as any }]}
         />
       </View>
-
-      {/* HUD info + butoane — rotire completă, responsiv în portrait/landscape */}
-      <RotatedView rotate={rotate} isLandscape={isLandscape}>
-        <View
-          style={[
-            s.cameraHudLayer,
-            {
-              paddingTop: isLandscape ? 8 : hudTopOffset,
-              paddingBottom: hudBottomOffset,
-              paddingLeft: Math.max(insets.left + 10, 10),
-              paddingRight: Math.max(insets.right + 10, 10),
-            },
-          ]}
-        >
-          <View style={[s.hudWrapper, s.hudWrapperAnchored]}>
-            <View style={s.hudInfo}>
-              <Text style={s.hudStep}>
-                {exerciseIndex + 1}/{exerciseKeys.length} · Set {setIndex + 1}/
-                {totalSets}
-              </Text>
-              <Text style={s.hudName}>{currentExercise.name}</Text>
-            </View>
-            <View style={s.hudCounter}>
-              <Text style={s.hudCountValue}>
-                {currentExercise.type === "timed"
-                  ? fmt(currentSetSeconds)
-                  : currentSetReps}
-              </Text>
-              <Text style={s.hudCountTarget}>
-                / {currentExercise.type === "timed" ? fmt(target) : target}
-              </Text>
-            </View>
-          </View>
-
-          <View style={s.hudBottomSpacer} />
-
-          <View style={s.hudBottom}>
-            <TouchableOpacity style={s.hudEndBtn} onPress={onExit}>
-              <Ionicons name="stop" size={15} color="#fff" />
-              <Text style={s.hudEndBtnText}>Oprește</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.hudSkipBtn, isLandscape && s.hudSkipBtnCompact]}
-              onPress={skipCurrentSet}
-            >
-              <Text
-                style={[s.hudSkipBtnText, isLandscape && s.hudSkipBtnTextCompact]}
-              >
-                Sari setul
-              </Text>
-              <Ionicons
-                name="arrow-forward"
-                size={isLandscape ? 13 : 15}
-                color={C.text}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </RotatedView>
     </View>
   );
 }
@@ -915,19 +854,11 @@ const s = StyleSheet.create({
   },
   cameraProgressFill: { height: 3, backgroundColor: C.accent },
 
-  cameraHudLayer: { flex: 1, width: "100%" },
-  hudBottomSpacer: { flex: 1 },
-
   hudWrapper: {
     position: "absolute",
     flexDirection: "row",
     gap: 8,
     zIndex: 40,
-  },
-  hudWrapperAnchored: {
-    position: "relative",
-    alignSelf: "flex-end",
-    maxWidth: "100%",
   },
   hudInfo: {
     backgroundColor: "rgba(247,248,250,0.88)",
@@ -935,8 +866,7 @@ const s = StyleSheet.create({
     padding: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.9)",
-    maxWidth: 150,
-    flexShrink: 1,
+    maxWidth: 160,
   },
   hudStep: { fontSize: 10, color: C.textMuted },
   hudName: { fontSize: 13, fontWeight: "700", color: C.text, marginTop: 1 },
@@ -958,14 +888,13 @@ const s = StyleSheet.create({
   hudCountTarget: { fontSize: 10, color: C.textMuted, marginTop: 1 },
 
   hudBottom: {
-    position: "relative",
-    left: 0,
-    right: 0,
+    position: "absolute",
+    left: 16,
+    right: 16,
     flexDirection: "row",
     gap: 10,
     zIndex: 40,
   },
-  hudSkipBtnCompact: { flex: 0, paddingHorizontal: 12, paddingVertical: 10 },
   hudEndBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -989,5 +918,4 @@ const s = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.9)",
   },
   hudSkipBtnText: { color: C.text, fontWeight: "700", fontSize: 14 },
-  hudSkipBtnTextCompact: { fontSize: 12 },
 });
