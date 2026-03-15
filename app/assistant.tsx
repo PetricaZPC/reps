@@ -5,37 +5,81 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, db } from "../firebase/firebaseConfig";
+import { saveTodayNutrition } from "../src/nutritionPersistence";
 import { passData } from "../src/passData";
 import { Gemini, extractCalories } from "../src/useGemini";
 
+// ─── Tokens ──────────────────────────────────────────────────
+const C = {
+  bg: "#F7F8FA",
+  glass: "rgba(255,255,255,0.72)",
+  glassBorder: "rgba(255,255,255,0.9)",
+  surface: "#FFFFFF",
+  accent: "#4F6EF7",
+  accentLight: "#EEF1FF",
+  text: "#0F0F10",
+  textMuted: "#8A8FA8",
+  textLight: "#B8BCCD",
+  border: "rgba(0,0,0,0.07)",
+  userBubble: "#0F0F10",
+  blob1: "#E8EDFF",
+  blob2: "#F0E8FF",
+};
+
+// ─── Typing indicator ────────────────────────────────────────
+function TypingDots() {
+  return (
+    <View style={s.aiRow}>
+      <View style={s.aiAvatar}>
+        <Ionicons name="nutrition" size={15} color={C.accent} />
+      </View>
+      <View
+        style={[s.aiBubble, { paddingHorizontal: 18, paddingVertical: 14 }]}
+      >
+        <View style={{ flexDirection: "row", gap: 5, alignItems: "center" }}>
+          <View style={s.dot} />
+          <View style={[s.dot, { opacity: 0.6 }]} />
+          <View style={[s.dot, { opacity: 0.3 }]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─── Main ────────────────────────────────────────────────────
 export default function Assistant() {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
+
   const [messages, setMessages] = useState([
     {
       from: "ai",
-      text: "Salut! Spune-mi ce ai mancat si eu iti voi oferi informatii nutriționale.",
+      text: "Salut! Spune-mi ce ai mâncat și eu îți voi oferi informații nutriționale.",
     },
   ]);
   const [userText, getUserText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const addCalories = passData((state) => state.addCalories);
-  const addProtein = passData((state) => state.addProtein);
-  const addCarbs = passData((state) => state.addCarbs);
+  const [inputFocused, setInputFocused] = useState(false);
+
+  const consumedCalories = passData((state) => state.calories);
+  const consumedProtein = passData((state) => state.protein);
+  const consumedCarbs = passData((state) => state.carbs);
+  const setTotals = passData((state) => state.setTotals);
 
   const [caloriesTarget, setCaloriesTarget] = useState(2000);
   const [proteinTarget, setProteinTarget] = useState(150);
   const [carbsTarget, setCarbsTarget] = useState(250);
-  const [currentCalories, setCurrentCalories] = useState(0);
-  const [currentProtein, setCurrentProtein] = useState(0);
-  const [currentCarbs, setCurrentCarbs] = useState(0);
   const [currentVitamins, setCurrentVitamins] = useState<string[]>([]);
   const [currentMinerals, setCurrentMinerals] = useState<string[]>([]);
 
@@ -50,38 +94,25 @@ export default function Assistant() {
       const snap = await getDoc(doc(db, "users", user.uid));
       if (!snap.exists()) return;
       const data = snap.data() as any;
-      const dailyCalories = Number(data?.plan?.dailyCalories);
-      const dailyProtein = Number(data?.plan?.dailyProtein);
-      const dailyCarbs = Number(data?.plan?.dailyCarbs);
-
-      if (!Number.isNaN(dailyCalories) && dailyCalories > 0) {
-        setCaloriesTarget(dailyCalories);
-      }
-      if (!Number.isNaN(dailyProtein) && dailyProtein > 0) {
-        setProteinTarget(dailyProtein);
-      }
-      if (!Number.isNaN(dailyCarbs) && dailyCarbs > 0) {
-        setCarbsTarget(dailyCarbs);
-      }
-    } catch {
-      // keep default targets
-    }
+      const cal = Number(data?.plan?.dailyCalories);
+      const prot = Number(data?.plan?.dailyProtein);
+      const carb = Number(data?.plan?.dailyCarbs);
+      if (!isNaN(cal) && cal > 0) setCaloriesTarget(cal);
+      if (!isNaN(prot) && prot > 0) setProteinTarget(prot);
+      if (!isNaN(carb) && carb > 0) setCarbsTarget(carb);
+    } catch {}
   }, []);
 
   useEffect(() => {
     loadTargets();
   }, [loadTargets]);
-
   useFocusEffect(
     useCallback(() => {
       loadTargets();
     }, [loadTargets]),
   );
 
-  const goBack = () => {
-    navigation.goBack();
-  };
-
+  // ── Prompt builders ──────────────────────────────────────
   const buildNutritionPrompt = (inputText: string) =>
     `Ești expert în nutriție. Analizează mâncarea descrisă mai jos și răspunde DOAR cu JSON valid, fără text extra, fără markdown, fără blocuri de cod.
 Schema JSON:
@@ -111,8 +142,62 @@ Răspunde în română, clar și practic, cu:
 3) total estimat calorii/proteine/carbohidrați
 4) sfaturi scurte de ajustare dacă rămâne sub/peste target.`;
 
+  const COMMON_FOOD_KEYWORDS = [
+    "ou",
+    "oua",
+    "ouă",
+    "pui",
+    "piept",
+    "orez",
+    "cartof",
+    "iaurt",
+    "lapte",
+    "branza",
+    "brânză",
+    "banana",
+    "banană",
+    "mar",
+    "măr",
+    "paine",
+    "pâine",
+    "somon",
+    "ton",
+    "paste",
+    "fasole",
+    "salata",
+    "salată",
+    "friptura",
+    "friptură",
+  ];
+
+  const hasLikelyFoodMention = (text: string) => {
+    const quantityPattern =
+      /\b\d+\s*(g|gr|kg|ml|l|buc|bucata|bucăți|bucati|felii|linguri|portii|porții|oua|ouă|ou)\b/;
+    const hasFoodWord = COMMON_FOOD_KEYWORDS.some((k) => text.includes(k));
+    return quantityPattern.test(text) || hasFoodWord;
+  };
+
+  const estimateQuickFood = (text: string) => {
+    const eggMatch = text.match(/\b(\d+)\s*(oua|ouă|ou|egg|eggs)\b/);
+    const hasEggWord = /\b(oua|ouă|ou|egg|eggs)\b/.test(text);
+
+    if (eggMatch || hasEggWord) {
+      const qty = eggMatch ? Math.max(Number(eggMatch[1]), 1) : 1;
+      return {
+        calories: qty * 72,
+        protein: qty * 6,
+        carbs: Math.round(qty * 0.4),
+        vitamins: ["B12", "D"],
+        minerals: ["Seleniu", "Fosfor"],
+      };
+    }
+
+    return null;
+  };
+
+  // ── Intent detection ─────────────────────────────────────
   const isOnTopic = (text: string) => {
-    const topicKeywords = [
+    const kw = [
       "manc",
       "mânc",
       "aliment",
@@ -141,11 +226,11 @@ Răspunde în română, clar și practic, cu:
       "workout",
       "fitness",
     ];
-    return topicKeywords.some((k) => text.includes(k));
+    return kw.some((k) => text.includes(k)) || hasLikelyFoodMention(text);
   };
 
   const isMealPlanRequest = (text: string) => {
-    const mealPlanKeywords = [
+    const kw = [
       "plan alimentar",
       "plan de mese",
       "meal plan",
@@ -157,12 +242,17 @@ Răspunde în română, clar și practic, cu:
       "ating target",
       "ating obiectiv",
       "plan pe azi",
+      "vreau plan",
+      "fa-mi plan",
+      "fă-mi plan",
+      "targetul de azi",
+      "obiectivul de azi",
     ];
-    return mealPlanKeywords.some((k) => text.includes(k));
+    return kw.some((k) => text.includes(k));
   };
 
   const isNutritionLogRequest = (text: string) => {
-    const nutritionKeywords = [
+    const kw = [
       "am mancat",
       "am mâncat",
       "am baut",
@@ -178,21 +268,22 @@ Răspunde în română, clar și practic, cu:
       "gram",
       "g ",
     ];
-    return nutritionKeywords.some((k) => text.includes(k));
+    return kw.some((k) => text.includes(k)) || hasLikelyFoodMention(text);
   };
 
+  // ── Send message ─────────────────────────────────────────
   const getMessage = async () => {
     if (!userText.trim()) return;
     const input = userText.trim().toLowerCase();
     setMessages((prev) => [...prev, { from: "user", text: userText }]);
     getUserText("");
     setIsTyping(true);
+
     try {
       const isRecipe =
         input.includes("retetă") ||
         input.includes("rețetă") ||
         input.includes("recipe");
-
       const mealPlanRequested = isMealPlanRequest(input);
       const nutritionLogRequested = isNutritionLogRequest(input);
       const onTopic = isOnTopic(input);
@@ -209,14 +300,25 @@ Răspunde în română, clar și practic, cu:
       }
 
       if (mealPlanRequested) {
-        const mealPlanResponse = await Gemini(buildMealPlanPrompt(userText));
-        setMessages((prev) => [...prev, { from: "ai", text: mealPlanResponse }]);
+        const response = await Gemini(buildMealPlanPrompt(userText));
+        if (response.startsWith("Error:")) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              from: "ai",
+              text: "Nu pot accesa AI acum, deci nu pot genera un plan alimentar în acest moment. Încearcă din nou când revine conexiunea.",
+            },
+          ]);
+          return;
+        }
+        setMessages((prev) => [...prev, { from: "ai", text: response }]);
         return;
       }
 
       if (isRecipe) {
-        const recipePrompt = `${userText} Ține cont că targetul zilnic al utilizatorului este ${caloriesTarget} calorii, ${proteinTarget}g proteină și ${carbsTarget}g carbohidrați. Oferă o rețetă care să se încadreze în aceste valori.`;
-        const response = await Gemini(recipePrompt);
+        const response = await Gemini(
+          `${userText} Ține cont că targetul zilnic al utilizatorului este ${caloriesTarget} calorii, ${proteinTarget}g proteină și ${carbsTarget}g carbohidrați. Oferă o rețetă care să se încadreze în aceste valori.`,
+        );
         setMessages((prev) => [...prev, { from: "ai", text: response }]);
         return;
       }
@@ -233,65 +335,74 @@ Răspunde în română, clar și practic, cu:
       }
 
       const response = await Gemini(buildNutritionPrompt(userText));
-      const extracted = extractCalories(response);
+      let extracted = extractCalories(response);
 
-      const hasNutritionData =
+      const isGeminiError = response.startsWith("Error:");
+      if (isGeminiError) {
+        const quickEstimate = estimateQuickFood(input);
+        if (quickEstimate) {
+          extracted = quickEstimate;
+        }
+      }
+
+      const hasData =
         extracted.calories > 0 ||
         extracted.protein > 0 ||
         extracted.carbs > 0 ||
         extracted.vitamins.length > 0 ||
         extracted.minerals.length > 0;
 
-      if (!hasNutritionData) {
+      if (!hasData) {
         setMessages((prev) => [
           ...prev,
           {
             from: "ai",
-            text: "Nu am putut estima valorile nutriționale din mesaj. Încearcă să scrii alimentul + cantitatea (ex: 200g piept de pui, 1 banană, 2 ouă).",
+            text: isGeminiError
+              ? "Nu pot accesa AI momentan (probabil conexiune), și nu am reușit nici estimarea locală. Încearcă din nou sau scrie mai clar aliment + cantitate."
+              : "Nu am putut estima valorile nutriționale din mesaj. Încearcă să scrii alimentul + cantitatea (ex: 200g piept de pui, 1 banană, 2 ouă).",
           },
         ]);
         return;
-      } else {
-        setCurrentCalories((prev) => prev + extracted.calories);
-        setCurrentProtein((prev) => prev + extracted.protein);
-        setCurrentCarbs((prev) => prev + extracted.carbs);
-        addCalories(extracted.calories);
-        addProtein(extracted.protein);
-        addCarbs(extracted.carbs);
-
-        if (extracted.vitamins.length) {
-          setCurrentVitamins((prev) => [
-            ...new Set([...prev, ...extracted.vitamins]),
-          ]);
-        }
-
-        if (extracted.minerals.length) {
-          setCurrentMinerals((prev) => [
-            ...new Set([...prev, ...extracted.minerals]),
-          ]);
-        }
       }
 
-      const nextCalories = currentCalories + extracted.calories;
-      const nextProtein = currentProtein + extracted.protein;
-      const nextCarbs = currentCarbs + extracted.carbs;
+      const nextCal = consumedCalories + extracted.calories;
+      const nextProt = consumedProtein + extracted.protein;
+      const nextCarb = consumedCarbs + extracted.carbs;
 
-      const calProgress = Math.min((nextCalories / caloriesTarget) * 100, 100);
-      const protProgress = Math.min((nextProtein / proteinTarget) * 100, 100);
-      const carbProgress = Math.min((nextCarbs / carbsTarget) * 100, 100);
+      setTotals({
+        calories: nextCal,
+        protein: nextProt,
+        carbs: nextCarb,
+      });
 
-      const vitaminsMerged = [
-        ...new Set([...currentVitamins, ...extracted.vitamins]),
-      ];
-      const mineralsMerged = [
-        ...new Set([...currentMinerals, ...extracted.minerals]),
-      ];
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await saveTodayNutrition(uid, {
+          calories: nextCal,
+          protein: nextProt,
+          carbs: nextCarb,
+        });
+      }
+      if (extracted.vitamins.length)
+        setCurrentVitamins((prev) => [
+          ...new Set([...prev, ...extracted.vitamins]),
+        ]);
+      if (extracted.minerals.length)
+        setCurrentMinerals((prev) => [
+          ...new Set([...prev, ...extracted.minerals]),
+        ]);
+
+      const calPct = Math.min((nextCal / caloriesTarget) * 100, 100);
+      const protPct = Math.min((nextProt / proteinTarget) * 100, 100);
+      const carbPct = Math.min((nextCarb / carbsTarget) * 100, 100);
+      const vit = [...new Set([...currentVitamins, ...extracted.vitamins])];
+      const min = [...new Set([...currentMinerals, ...extracted.minerals])];
 
       setMessages((prev) => [
         ...prev,
         {
           from: "ai",
-          text: `Adăugat la target: ${extracted.calories} cal, ${extracted.protein}g prot, ${extracted.carbs}g carb.\nProgres zilnic: Calorii ${Math.round(calProgress)}%, Proteină ${Math.round(protProgress)}%, Carbohidrați ${Math.round(carbProgress)}%.\nVitamine detectate: ${vitaminsMerged.length ? vitaminsMerged.join(", ") : "-"}.\nMinerale detectate: ${mineralsMerged.length ? mineralsMerged.join(", ") : "-"}.`,
+          text: `Adăugat: ${extracted.calories} cal · ${extracted.protein}g prot · ${extracted.carbs}g carb\n\nProgres zilnic: Calorii ${Math.round(calPct)}% · Proteină ${Math.round(protPct)}% · Carbs ${Math.round(carbPct)}%\n\nVitamine: ${vit.length ? vit.join(", ") : "—"}\nMinerale: ${min.length ? min.join(", ") : "—"}`,
         },
       ]);
     } catch (error) {
@@ -300,7 +411,7 @@ Răspunde în română, clar și practic, cu:
         {
           from: "ai",
           text:
-            "Error: " +
+            "Eroare: " +
             (error instanceof Error ? error.message : String(error)),
         },
       ]);
@@ -309,115 +420,278 @@ Răspunde în română, clar și practic, cu:
     }
   };
 
+  const canSend = !!userText.trim() && !isTyping;
+
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={s.root}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
     >
-      <View className="flex-1 bg-gradient-to-b from-gray-50 to-white">
-        {/* Header */}
-        <View className="bg-gradient-to-r from-blue-500 to-purple-600 pt-12 pb-4 px-4 flex-row items-center shadow-2xl">
-          <Pressable onPress={goBack} className="mr-4">
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
-          <View className="flex-row items-center">
-            <View className="w-12 h-12 bg-white rounded-full items-center justify-center mr-3 shadow-2xl">
-              <Ionicons name="restaurant" size={22} color="#0095F6" />
-            </View>
-            <Text className="text-white text-xl font-bold">
-              Asistent Nutrițional
-            </Text>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+
+      {/* Blobs */}
+      <View
+        style={[s.blob, { top: -60, right: -80, backgroundColor: C.blob1 }]}
+      />
+      <View
+        style={[
+          s.blob,
+          {
+            bottom: 120,
+            left: -80,
+            width: 220,
+            height: 220,
+            backgroundColor: C.blob2,
+          },
+        ]}
+      />
+
+      {/* ── Header ── */}
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <View style={s.headerCenter}>
+          <View style={s.headerIconWrap}>
+            <Ionicons name="nutrition" size={17} color={C.accent} />
+          </View>
+          <View>
+            <Text style={s.headerTitle}>Asistent Nutrițional</Text>
+            <Text style={s.headerSub}>powered by Gemini</Text>
           </View>
         </View>
+        {/* Target summary pill */}
+        <View style={s.targetPill}>
+          <Text style={s.targetPillText}>{caloriesTarget} kcal</Text>
+        </View>
+      </View>
 
-        {/* Chat Messages */}
-        <ScrollView
-          ref={scrollViewRef}
-          className="flex-1 px-4"
-          contentContainerStyle={{ paddingVertical: 16 }}
+      {/* ── Messages ── */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={s.messageList}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {messages.map((msg, idx) =>
+          msg.from === "user" ? (
+            <View key={idx} style={s.userRow}>
+              <View style={s.userBubble}>
+                <Text style={s.userText}>{msg.text}</Text>
+              </View>
+            </View>
+          ) : (
+            <View key={idx} style={s.aiRow}>
+              <View style={s.aiAvatar}>
+                <Ionicons name="nutrition" size={15} color={C.accent} />
+              </View>
+              <View style={s.aiBubble}>
+                <Text style={s.aiText}>{msg.text}</Text>
+              </View>
+            </View>
+          ),
+        )}
+        {isTyping && <TypingDots />}
+      </ScrollView>
+
+      {/* ── Input area ── */}
+      <View
+        style={[
+          s.inputArea,
+          { paddingBottom: Math.max(insets.bottom + 8, 16) },
+        ]}
+      >
+        <TextInput
+          style={[s.input, inputFocused && s.inputFocused]}
+          placeholder="Scrie un mesaj..."
+          placeholderTextColor={C.textLight}
+          value={userText}
+          multiline
+          numberOfLines={3}
+          textAlignVertical="top"
+          onChangeText={getUserText}
+          onFocus={() => setInputFocused(true)}
+          onBlur={() => setInputFocused(false)}
+        />
+        <TouchableOpacity
+          style={[s.sendBtn, !canSend && s.sendBtnDisabled]}
+          onPress={getMessage}
+          disabled={!canSend}
+          activeOpacity={0.85}
         >
-          {messages.map((msg, idx) => (
-            <View
-              key={idx}
-              className={`flex-row mb-6 ${msg.from === "user" ? "justify-end" : "justify-start"}`}
-            >
-              {msg.from === "ai" && (
-                <View className="w-12 h-12 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full items-center justify-center mr-3 mt-1 shadow-md">
-                  <Ionicons name="chatbubble" size={18} color="white" />
-                </View>
-              )}
-              <View
-                className={`rounded-3xl px-5 py-4 max-w-xs shadow-2xl ${
-                  msg.from === "user"
-                    ? "bg-gradient-to-r from-blue-500 to-blue-700 self-end"
-                    : "bg-white border border-gray-200 self-start"
-                }`}
-              >
-                <Text
-                  className={`text-base leading-6 ${
-                    msg.from === "user"
-                      ? "text-white font-semibold"
-                      : "text-gray-900 font-medium"
-                  }`}
-                >
-                  {msg.text}
-                </Text>
-              </View>
-              {msg.from === "user" && (
-                <View className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full items-center justify-center ml-3 mt-1 shadow-md">
-                  <Ionicons name="person" size={18} color="white" />
-                </View>
-              )}
-            </View>
-          ))}
-          {isTyping && (
-            <View className="flex-row mb-6 justify-start">
-              <View className="w-12 h-12 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full items-center justify-center mr-3 mt-1 shadow-md">
-                <Ionicons name="chatbubble" size={18} color="white" />
-              </View>
-              <View className="bg-white border border-gray-200 rounded-3xl px-5 py-4 shadow-2xl">
-                <View className="flex-row">
-                  <View className="w-3 h-3 bg-blue-400 rounded-full mr-2 animate-pulse" />
-                  <View className="w-3 h-3 bg-blue-400 rounded-full mr-2 animate-pulse" />
-                  <View className="w-3 h-3 bg-blue-400 rounded-full animate-pulse" />
-                </View>
-              </View>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Input Area */}
-        <View className="bg-gradient-to-t from-gray-100 to-white border-t border-gray-300 px-4 py-4 shadow-2xl">
-          <View className="flex-row items-end">
-            <TextInput
-              className="flex-1 border border-gray-400 rounded-3xl px-5 py-4 min-h-12 max-h-32 bg-white text-gray-900 text-base shadow-2xl"
-              placeholder="Scrie un mesaj..."
-              placeholderTextColor="#6b7280"
-              value={userText}
-              multiline={true}
-              numberOfLines={3}
-              textAlignVertical="top"
-              onChangeText={getUserText}
-            />
-            <Pressable
-              onPress={getMessage}
-              disabled={!userText.trim() || isTyping}
-              className={`ml-4 w-14 h-14 rounded-full items-center justify-center shadow-2xl ${
-                !userText.trim() || isTyping
-                  ? "bg-gray-400"
-                  : "bg-gradient-to-r from-blue-500 to-purple-600"
-              }`}
-            >
-              <Ionicons
-                name="send"
-                size={22}
-                color={!userText.trim() || isTyping ? "#9ca3af" : "white"}
-              />
-            </Pressable>
-          </View>
-        </View>
+          <Ionicons
+            name="send"
+            size={17}
+            color={canSend ? "#fff" : C.textLight}
+          />
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
+
+// ─── Styles ──────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  blob: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    opacity: 0.5,
+  },
+
+  // Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    backgroundColor: C.glass,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  backBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerCenter: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  headerIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: C.accentLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.text,
+    letterSpacing: -0.3,
+  },
+  headerSub: { fontSize: 11, color: C.textMuted, marginTop: 1 },
+  targetPill: {
+    backgroundColor: C.accentLight,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  targetPillText: { fontSize: 11, fontWeight: "700", color: C.accent },
+
+  // Messages
+  messageList: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 10,
+  },
+
+  // User bubble
+  userRow: { flexDirection: "row", justifyContent: "flex-end" },
+  userBubble: {
+    backgroundColor: C.userBubble,
+    borderRadius: 20,
+    borderBottomRightRadius: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    maxWidth: "80%",
+  },
+  userText: { color: "#FFFFFF", fontSize: 15, lineHeight: 22 },
+
+  // AI bubble
+  aiRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  aiAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: C.accentLight,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  aiBubble: {
+    backgroundColor: C.surface,
+    borderRadius: 20,
+    borderBottomLeftRadius: 5,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    maxWidth: "80%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  aiText: { color: C.text, fontSize: 15, lineHeight: 22 },
+
+  // Dots
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: C.accent,
+  },
+
+  // Input
+  inputArea: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: C.glass,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: C.surface,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: C.text,
+    maxHeight: 120,
+    minHeight: 48,
+  },
+  inputFocused: {
+    borderColor: C.accent,
+    backgroundColor: C.accentLight,
+  },
+  sendBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: C.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sendBtnDisabled: {
+    backgroundColor: C.bg,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+});

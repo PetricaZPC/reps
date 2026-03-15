@@ -6,20 +6,40 @@ import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { auth } from "../firebase/firebaseConfig";
 import SignIn from "../firebase/signIn";
+import { loadTodayNutrition } from "../src/nutritionPersistence";
+import { passData } from "../src/passData";
 import "./globals.css";
 
 export default function TabLayout() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const setTotals = passData((state) => state.setTotals);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsLoading(false);
+
+      if (!currentUser) {
+        setTotals({ calories: 0, protein: 0, carbs: 0 });
+        return;
+      }
+
+      loadTodayNutrition(currentUser.uid)
+        .then((totals) => {
+          if (!totals) {
+            setTotals({ calories: 0, protein: 0, carbs: 0 });
+            return;
+          }
+          setTotals(totals);
+        })
+        .catch(() => {
+          setTotals({ calories: 0, protein: 0, carbs: 0 });
+        });
     });
 
     return unsubscribe;
-  }, []);
+  }, [setTotals]);
 
   if (isLoading) {
     return (
