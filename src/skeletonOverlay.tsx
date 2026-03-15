@@ -33,19 +33,53 @@ const JOINTS: (keyof typeof landmarkIndexMap)[] = [
 interface Props {
   landmarks: any[];
   affectedLandmarks: string[];
+  isFrontCamera?: boolean; // Opțional: setează pe true dacă imaginea e în oglindă
 }
 
-export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props) {
+export default function SkeletonOverlay({ landmarks, affectedLandmarks, isFrontCamera = false }: Props) {
   const { width, height } = useWindowDimensions();
+  
   if (!landmarks || landmarks.length === 0) return null;
+
+  // ─── ALGORITM DE CALIBRARE (Aspect-Fill Correction) ───
+  // Majoritatea camerelor video raportează cadre 16:9 (1.777) sau 4:3 (1.333).
+  // Ajustează acest număr dacă observi că decalează în continuare.
+  const CAMERA_ASPECT_RATIO = 16 / 9; 
+  const screenRatio = height / width;
+
+  let videoWidth = width;
+  let videoHeight = height;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  // Calculăm cu cât s-a "întins" videoul ca să acopere ecranul
+  if (screenRatio > CAMERA_ASPECT_RATIO) {
+    // Ecranul este mai înalt decât videoul (videoul a tăiat din stânga și dreapta)
+    videoWidth = height / CAMERA_ASPECT_RATIO;
+    offsetX = (width - videoWidth) / 2; // Offset negativ
+  } else {
+    // Ecranul este mai lat decât videoul (videoul a tăiat din sus și jos)
+    videoHeight = width * CAMERA_ASPECT_RATIO;
+    offsetY = (height - videoHeight) / 2;
+  }
 
   const getLandmarkPos = (name: keyof typeof landmarkIndexMap) => {
     const idx = landmarkIndexMap[name];
     const point = landmarks[idx];
     if (!point) return null;
+
+    // Aplicăm offset-ul și noul scale pentru a mapa perfect peste imaginea tăiată
+    let calculatedX = point.x * videoWidth + offsetX;
+    let calculatedY = point.y * videoHeight + offsetY;
+
+    // Dacă folosești camera de selfie, trebuie întors axul X în oglindă
+    if (isFrontCamera) {
+      calculatedX = width - calculatedX; 
+    }
+
     return {
-      x: point.x * width,
-      y: point.y * height,
+      x: calculatedX,
+      y: calculatedY,
       visibility: point.visibility ?? 1,
     };
   };
@@ -58,12 +92,14 @@ export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props)
       height={height}
       style={{ position: "absolute", top: 0, left: 0, zIndex: 10 }}
     >
-      {/* Connection lines */}
+      {/* Liniile de conexiune */}
       {CONNECTIONS.map(([from, to], idx) => {
         const p1 = getLandmarkPos(from);
         const p2 = getLandmarkPos(to);
+        
         if (!p1 || !p2) return null;
         if (p1.visibility < 0.5 || p2.visibility < 0.5) return null;
+        
         const affected = isAffected(from) || isAffected(to);
         return (
           <Line
@@ -77,10 +113,12 @@ export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props)
         );
       })}
 
-      {/* Joint circles */}
+      {/* Articulațiile (Cercurile) */}
       {JOINTS.map((name) => {
         const pos = getLandmarkPos(name);
+        
         if (!pos || pos.visibility < 0.5) return null;
+        
         const affected = isAffected(name);
         return (
           <Circle
