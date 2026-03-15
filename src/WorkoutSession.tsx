@@ -5,6 +5,7 @@ import {
     Animated,
     Dimensions,
     Easing,
+    Platform,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -68,28 +69,26 @@ const getSets = (difficulty: string): number => {
   }
 };
 
-const getTarget = (exercise: ExerciseConfig, difficulty: string): number => {
+const getTarget = (
+  exercise: ExerciseConfig,
+  difficulty: string,
+  customTarget?: number,
+): number => {
+  // Dacă există un target custom setat de utilizator, îl folosim
+  if (customTarget !== undefined && customTarget > 0) return customTarget;
   if (exercise.type === "timed") {
     switch (difficulty) {
-      case "beginner":
-        return 20;
-      case "intermediate":
-        return 30;
-      case "advanced":
-        return 45;
-      default:
-        return 30;
+      case "beginner": return 20;
+      case "intermediate": return 30;
+      case "advanced": return 45;
+      default: return 30;
     }
   } else {
     switch (difficulty) {
-      case "beginner":
-        return 8;
-      case "intermediate":
-        return 12;
-      case "advanced":
-        return 15;
-      default:
-        return 10;
+      case "beginner": return 8;
+      case "intermediate": return 12;
+      case "advanced": return 15;
+      default: return 10;
     }
   }
 };
@@ -234,7 +233,7 @@ export default function WorkoutSession({
   const { rotate, isLandscape } = useDeviceRotation();
   const { width, height } = Dimensions.get("window");
 
-  const totalSets = getSets(preset.difficulty);
+  const totalSets = preset.customSets ?? getSets(preset.difficulty);
   const exerciseKeys = preset.exercises;
 
   const [exerciseIndex, setExerciseIndex] = useState(0);
@@ -251,7 +250,11 @@ export default function WorkoutSession({
 
   const currentKey = exerciseKeys[exerciseIndex];
   const currentExercise = EXERCISES[currentKey] ?? fallbackExercise(currentKey);
-  const target = getTarget(currentExercise, preset.difficulty);
+  const target = getTarget(
+    currentExercise,
+    preset.difficulty,
+    preset.customTargets?.[currentKey],
+  );
   const isLastSet = setIndex === totalSets - 1;
   const isLastExercise = exerciseIndex === exerciseKeys.length - 1;
   const progressPct =
@@ -737,60 +740,47 @@ const s = StyleSheet.create({
 
   restLabel: { fontSize: 15, color: C.textMuted, fontWeight: "600" },
   timerCard: {
-    backgroundColor: C.glass,
+    // Android: elevation + rgba background = patrat alb; folosim transparent
+    backgroundColor: Platform.OS === "android" ? "transparent" : C.glass,
     borderRadius: 24,
-    borderWidth: 1,
+    borderWidth: Platform.OS === "android" ? 0 : 1,
     borderColor: C.glassBorder,
     paddingHorizontal: 48,
     paddingVertical: 24,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    alignItems: "center" as const,
   },
   timerValue: {
     fontSize: 72,
-    fontWeight: "700",
+    fontWeight: "700" as const,
     color: C.warning,
     letterSpacing: -2,
   },
   timerCardSm: {
-    backgroundColor: C.glass,
+    backgroundColor: Platform.OS === "android" ? "transparent" : C.glass,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: Platform.OS === "android" ? 0 : 1,
     borderColor: C.glassBorder,
     paddingHorizontal: 32,
     paddingVertical: 18,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 2,
+    alignItems: "center" as const,
   },
   timerValueSm: {
     fontSize: 48,
-    fontWeight: "700",
+    fontWeight: "700" as const,
     color: C.warning,
     letterSpacing: -1,
   },
   timerSub: { fontSize: 13, color: C.textMuted, marginTop: 4 },
 
   nextCard: {
-    backgroundColor: C.glass,
+    backgroundColor: Platform.OS === "android" ? "#FFFFFF" : C.glass,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.glassBorder,
+    borderColor: Platform.OS === "android" ? "rgba(0,0,0,0.07)" : C.glassBorder,
     padding: 18,
-    alignItems: "center",
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    alignItems: "center" as const,
+    width: "100%" as const,
+    elevation: Platform.OS === "android" ? 2 : 0,
   },
   nextLabel: {
     fontSize: 10,

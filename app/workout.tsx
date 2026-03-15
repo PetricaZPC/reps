@@ -81,18 +81,22 @@ interface CustomWorkout {
   id?: string;
   name: string;
   exercises: string[];
+  customTargets?: Record<string, number>;
+  customSets?: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
 // Convertește un CustomWorkout într-un WorkoutPreset ca să îl putem
 // da direct la WorkoutSession (care știe deja să facă seturi, pauze, skip, log etc.)
-function customToPreset(w: CustomWorkout): WorkoutPreset {
+function customToPreset(w: CustomWorkout, targets?: Record<string, number>, sets?: number): WorkoutPreset {
   return {
     id: w.id ?? "custom",
     name: w.name,
     description: `Antrenament personalizat · ${w.exercises.length} exerciții`,
     exercises: w.exercises,
-    difficulty: "intermediate", // default rezonabil; poți adăuga un selector mai târziu
+    difficulty: "intermediate",
+    customTargets: targets,
+    customSets: sets,
   };
 }
 
@@ -146,17 +150,59 @@ function ExerciseRow({
 }
 
 function CheckboxRow({
-  title, checked, onPress,
+  title, checked, onPress, target, onTargetChange, isTimed,
 }: {
-  title: string; checked: boolean; onPress: () => void;
+  title: string;
+  checked: boolean;
+  onPress: () => void;
+  target?: number;
+  onTargetChange?: (val: number) => void;
+  isTimed?: boolean;
 }) {
+  const REPS_OPTIONS = isTimed
+    ? [15, 20, 30, 45, 60, 90, 120]
+    : [5, 8, 10, 12, 15, 20, 25, 30];
+
   return (
-    <TouchableOpacity style={s.checkboxRow} onPress={onPress} activeOpacity={0.75}>
-      <View style={[s.checkbox, checked && s.checkboxChecked]}>
-        {checked && <Ionicons name="checkmark" size={12} color="#fff" />}
-      </View>
-      <Text style={s.checkboxLabel}>{title}</Text>
-    </TouchableOpacity>
+    <View style={s.checkboxRow}>
+      <TouchableOpacity
+        style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}
+        onPress={onPress}
+        activeOpacity={0.75}
+      >
+        <View style={[s.checkbox, checked && s.checkboxChecked]}>
+          {checked && <Ionicons name="checkmark" size={12} color="#fff" />}
+        </View>
+        <Text style={s.checkboxLabel}>{title}</Text>
+      </TouchableOpacity>
+      {checked && onTargetChange && (
+        <View style={s.repsPicker}>
+          <TouchableOpacity
+            onPress={() => {
+              const idx = REPS_OPTIONS.indexOf(target ?? REPS_OPTIONS[2]);
+              if (idx > 0) onTargetChange(REPS_OPTIONS[idx - 1]);
+            }}
+            style={s.repsBtn}
+            activeOpacity={0.7}
+          >
+            <Text style={s.repsBtnText}>−</Text>
+          </TouchableOpacity>
+          <Text style={s.repsValue}>
+            {target ?? REPS_OPTIONS[2]}{isTimed ? "s" : ""}
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              const idx = REPS_OPTIONS.indexOf(target ?? REPS_OPTIONS[2]);
+              if (idx < REPS_OPTIONS.length - 1) onTargetChange(REPS_OPTIONS[idx + 1]);
+            }}
+            style={s.repsBtn}
+            activeOpacity={0.7}
+          >
+            <Text style={s.repsBtnText}>+</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -206,6 +252,9 @@ export default function Workout() {
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
   const [savedWorkouts, setSavedWorkouts] = useState<CustomWorkout[]>([]);
   const [nameInputFocused, setNameInputFocused] = useState(false);
+  // Target-uri custom per exercițiu la crearea unui workout nou
+  const [customTargets, setCustomTargets] = useState<Record<string, number>>({});
+  const [customSets, setCustomSets] = useState<number>(3); // default 3 seturi
 
   // Ascunde tab bar în ecranele de antrenament activ
   useEffect(() => {
@@ -327,6 +376,8 @@ export default function Workout() {
       await addDoc(collection(db, `users/${auth.currentUser.uid}/customWorkouts`), {
         name: customWorkoutName,
         exercises: selectedExercises,
+        customTargets,
+        customSets,
         createdAt: new Date().toISOString(),
       });
       Alert.alert("Salvat!", "Antrenamentul tău a fost salvat.");
@@ -407,7 +458,7 @@ export default function Workout() {
 
   // ── Custom session ── (NOU: folosește WorkoutSession exact ca preset-urile)
   if (screen === "custom_session" && selectedCustomWorkout) {
-    const preset = customToPreset(selectedCustomWorkout);
+    const preset = customToPreset(selectedCustomWorkout, selectedCustomWorkout.customTargets, selectedCustomWorkout.customSets);
     return (
       <WorkoutSession
         preset={preset}
@@ -422,7 +473,7 @@ export default function Workout() {
 
   // ── Custom summary ── (NOU: același WorkoutSummary)
   if (screen === "custom_summary" && selectedCustomWorkout) {
-    const preset = customToPreset(selectedCustomWorkout);
+    const preset = customToPreset(selectedCustomWorkout, selectedCustomWorkout.customTargets, selectedCustomWorkout.customSets);
     return (
       <WorkoutSummary
         preset={preset}
@@ -439,9 +490,9 @@ export default function Workout() {
 
   // ── Custom overview ── (NOU: preview înainte de start, identic cu preset_overview)
   if (screen === "custom_overview" && selectedCustomWorkout) {
-    const preset = customToPreset(selectedCustomWorkout);
+    const preset = customToPreset(selectedCustomWorkout, selectedCustomWorkout.customTargets, selectedCustomWorkout.customSets);
     const exercises = getPresetExercises(preset);
-    const totalSets = 3; // intermediate = 3 seturi
+    const totalSets = selectedCustomWorkout.customSets ?? 3;
     return (
       <View style={s.root}>
         <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
@@ -632,20 +683,48 @@ export default function Workout() {
             <Text style={[s.badgeText, { color: C.accent }]}>{selectedExercises.length} selectate</Text>
           </View>
         </View>
+        {/* ── Picker seturi ── */}
+        <View style={s.setsPickerBar}>
+          <Text style={s.setsPickerLabel}>Seturi per exercițiu</Text>
+          <View style={s.repsPicker}>
+            {[2, 3, 4, 5].map((n) => (
+              <TouchableOpacity
+                key={n}
+                onPress={() => setCustomSets(n)}
+                style={[s.setsOption, customSets === n && s.setsOptionActive]}
+                activeOpacity={0.75}
+              >
+                <Text style={[s.setsOptionText, customSets === n && s.setsOptionTextActive]}>
+                  {n}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           {muscleGroups.map((group) => {
             const list = Object.keys(EXERCISES).filter((k) => EXERCISES[k].muscleGroup === group);
             if (!list.length) return null;
             return (
               <GroupCard key={group} title={muscleLabel[group]}>
-                {list.map((key) => (
-                  <CheckboxRow
-                    key={key}
-                    title={EXERCISES[key].name}
-                    checked={selectedExercises.includes(key)}
-                    onPress={() => toggleExercise(key)}
-                  />
-                ))}
+                {list.map((key) => {
+                  const ex = EXERCISES[key];
+                  const defaultTarget = ex.type === "timed" ? 30 : 12;
+                  return (
+                    <CheckboxRow
+                      key={key}
+                      title={ex.name}
+                      checked={selectedExercises.includes(key)}
+                      onPress={() => toggleExercise(key)}
+                      isTimed={ex.type === "timed"}
+                      target={customTargets[key] ?? defaultTarget}
+                      onTargetChange={(val) =>
+                        setCustomTargets((prev) => ({ ...prev, [key]: val }))
+                      }
+                    />
+                  );
+                })}
               </GroupCard>
             );
           })}
@@ -675,7 +754,7 @@ export default function Workout() {
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           <TouchableOpacity
             style={s.createCard}
-            onPress={() => { setCustomWorkoutName(""); setSelectedExercises([]); setScreen("customSelect"); }}
+            onPress={() => { setCustomWorkoutName(""); setSelectedExercises([]); setCustomTargets({}); setCustomSets(3); setScreen("customSelect"); }}
             activeOpacity={0.82}
           >
             <View style={s.createCardIcon}>
@@ -951,7 +1030,54 @@ const s = StyleSheet.create({
   },
   menuCardTitle: { fontSize: 16, fontWeight: "700", color: C.text, letterSpacing: -0.3 },
   menuCardSub: { fontSize: 13, color: C.textMuted, marginTop: 2 },
-
-  // lipsea din versiunea originală — necesară pentru surface în styles
   surface: { backgroundColor: C.surface },
+
+  // Reps picker în customSelect
+  repsPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.accentLight,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  repsBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: C.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  repsBtnText: { color: "#fff", fontSize: 16, fontWeight: "700", lineHeight: 20 },
+  repsValue: { fontSize: 13, fontWeight: "700", color: C.accent, minWidth: 32, textAlign: "center" },
+
+  setsPickerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: isAndroid ? C.surface : C.glass,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  setsPickerLabel: { fontSize: 14, fontWeight: "600", color: C.text },
+  setsOption: {
+    width: 40,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.bg,
+  },
+  setsOptionActive: {
+    backgroundColor: C.accent,
+    borderColor: C.accent,
+  },
+  setsOptionText: { fontSize: 15, fontWeight: "700", color: C.textMuted },
+  setsOptionTextActive: { color: "#fff" },
 });
