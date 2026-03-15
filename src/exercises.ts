@@ -93,8 +93,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   pushups: {
     name: "Push-ups",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 85,   // Foarte relaxat
-    maxAngle: 145,  // Nu e nevoie să blochezi perfect cotul
+    minAngle: 100,  // Foarte relaxat (înainte era 85). O mică îndoire a cotului declanșează coborârea.
+    maxAngle: 140,  // Nu e nevoie să întinzi brațul complet (înainte era 145)
     side: "both",
     countOn: "up",
     type: "reps",
@@ -104,7 +104,7 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
     formRules: [
       {
         landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-        minAngle: 100, // Toleranță extremă pentru spatele "drept" în proiecție 2D
+        minAngle: 100, 
         maxAngle: 180,
         message: "Atenție la bazin, încearcă să stai drept!",
         affectedLandmarks: ["leftHip"],
@@ -115,8 +115,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   squats: {
     name: "Squats",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 85,
-    maxAngle: 150,
+    minAngle: 115,  // Permite o half-squat (jumătate de genuflexiune)
+    maxAngle: 145,  // Nu trebuie să stai perfect drept la ridicare
     side: "both",
     countOn: "up",
     type: "reps",
@@ -126,7 +126,7 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
     formRules: [
       {
         landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-        minAngle: 30, // Permite o aplecare naturală severă în față
+        minAngle: 30, 
         maxAngle: 180,
         message: "Ține pieptul sus!",
         affectedLandmarks: ["leftShoulder", "leftHip"],
@@ -137,8 +137,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   situps: {
     name: "Sit-ups",
     landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-    minAngle: 75,
-    maxAngle: 140,
+    minAngle: 95,   // Nu mai trebuie să te ridici cu pieptul lipit de genunchi
+    maxAngle: 130,  // Nu mai trebuie să te întinzi complet pe podea la revenire
     side: "both",
     countOn: "down",
     type: "reps",
@@ -159,8 +159,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   lunges: {
     name: "Lunges",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 80,
-    maxAngle: 155,
+    minAngle: 105,  // O fandare mult mai scurtă va fi înregistrată
+    maxAngle: 145,
     side: "left",
     countOn: "up",
     type: "reps",
@@ -181,8 +181,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   calfRaises: {
     name: "Calf Raises",
     landmarks: ["leftKnee", "leftAnkle", "leftFootIndex"],
-    minAngle: 90,
-    maxAngle: 125,
+    minAngle: 95,
+    maxAngle: 115,  // O ridicare mică pe vârfuri e suficientă
     side: "both",
     countOn: "up",
     type: "reps",
@@ -203,8 +203,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   pullups: {
     name: "Pull-ups",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 65,
-    maxAngle: 150,
+    minAngle: 90,   // Bărbia nu mai trebuie să treacă de bară, o tragere la jumătate e ok
+    maxAngle: 140,  // Nu te mai lăsa cu brațele perfect întinse
     side: "both",
     countOn: "down",
     type: "reps",
@@ -225,7 +225,7 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   plank: {
     name: "Plank",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 110,
+    minAngle: 100,  // Foarte relaxat pentru coate/umeri
     maxAngle: 180,
     side: "both",
     countOn: "up",
@@ -236,7 +236,7 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
     formRules: [
       {
         landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-        minAngle: 110, // Toleranță uriașă
+        minAngle: 110, 
         maxAngle: 180,
         message: "Atenție la bazin, menține spatele drept!",
         affectedLandmarks: ["leftHip"],
@@ -247,8 +247,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   gluteBridge: {
     name: "Glute Bridge",
     landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-    minAngle: 110,
-    maxAngle: 160,
+    minAngle: 125,  // Jos nu mai trebuie să atingi cu fundul podeaua pentru a reseta repetarea
+    maxAngle: 145,  // Sus nu mai trebuie să formezi o linie perfect dreaptă
     side: "both",
     countOn: "up",
     type: "reps",
@@ -269,8 +269,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   mountainClimbers: {
     name: "Mountain Climbers",
     landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-    minAngle: 80,
-    maxAngle: 150,
+    minAngle: 100,  // Genunchiul tras mult mai puțin spre piept
+    maxAngle: 140,  // Piciorul întins mult mai lejer în spate
     side: "both",
     countOn: "up",
     type: "reps",
@@ -291,8 +291,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   jumpingJacks: {
     name: "Jumping Jacks",
     landmarks: ["leftHip", "leftShoulder", "leftWrist"],
-    minAngle: 30,
-    maxAngle: 140,
+    minAngle: 45,   // Brațele nu mai trebuie să lovească coapsele
+    maxAngle: 120,  // Brațele nu mai trebuie să se ridice perfect deasupra capului
     side: "both",
     countOn: "up",
     type: "reps",
@@ -313,8 +313,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   highKnees: {
     name: "High Knees",
     landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-    minAngle: 85,
-    maxAngle: 155,
+    minAngle: 105,  // Genunchii nu trebuie aduși atât de sus
+    maxAngle: 140,
     side: "both",
     countOn: "up",
     type: "reps",
@@ -335,8 +335,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   wallSit: {
     name: "Wall Sit",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 75,
-    maxAngle: 120,
+    minAngle: 60,   // Permite mai multă lejeritate în poziția unghiului
+    maxAngle: 130,
     side: "both",
     countOn: "up",
     type: "timed",
@@ -347,7 +347,7 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
       {
         landmarks: ["leftShoulder", "leftHip", "leftKnee"],
         minAngle: 45,
-        maxAngle: 130, 
+        maxAngle: 140, 
         message: "Ține spatele lipit de perete!",
         affectedLandmarks: ["leftShoulder", "leftHip"],
       },
@@ -357,8 +357,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   diamondPushups: {
     name: "Diamond Push-ups",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 85,
-    maxAngle: 145,
+    minAngle: 95,
+    maxAngle: 140,
     side: "both",
     countOn: "up",
     type: "reps",
@@ -379,8 +379,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   widePushups: {
     name: "Wide Push-ups",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 85,
-    maxAngle: 145,
+    minAngle: 95,
+    maxAngle: 140,
     side: "both",
     countOn: "up",
     type: "reps",
@@ -401,8 +401,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   pikePushups: {
     name: "Pike Push-ups",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 75,
-    maxAngle: 140,
+    minAngle: 90,
+    maxAngle: 135,
     side: "both",
     countOn: "up",
     type: "reps",
@@ -423,8 +423,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   dips: {
     name: "Dips (Chair)",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 85,
-    maxAngle: 150,
+    minAngle: 100,  // Coborâre scurtă
+    maxAngle: 140,  // Întindere relaxată
     side: "both",
     countOn: "up",
     type: "reps",
@@ -445,8 +445,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   stepUps: {
     name: "Step-ups",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 85,
-    maxAngle: 155,
+    minAngle: 100,
+    maxAngle: 145,
     side: "left",
     countOn: "up",
     type: "reps",
@@ -467,8 +467,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   deadBug: {
     name: "Dead Bug",
     landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-    minAngle: 75,
-    maxAngle: 155,
+    minAngle: 90,
+    maxAngle: 140,
     side: "both",
     countOn: "down",
     type: "reps",
@@ -489,8 +489,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   legRaises: {
     name: "Leg Raises",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 75,
-    maxAngle: 145,
+    minAngle: 90,   // Picioarele nu mai trebuie aduse perfect verticale (sus)
+    maxAngle: 135,  // Picioarele nu mai trebuie lăsate până aproape de podea (jos)
     side: "both",
     countOn: "down",
     type: "reps",
@@ -511,7 +511,7 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   sidePlank: {
     name: "Side Plank",
     landmarks: ["leftShoulder", "leftHip", "leftAnkle"],
-    minAngle: 120,
+    minAngle: 110,
     maxAngle: 180,
     side: "left",
     countOn: "up",
@@ -533,8 +533,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   wallPushup: {
     name: "Wall Push-up",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 90,
-    maxAngle: 155,
+    minAngle: 100,
+    maxAngle: 145,
     side: "both",
     countOn: "up",
     type: "reps",
@@ -555,8 +555,8 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   burpees: {
     name: "Burpees",
     landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-    minAngle: 75,
-    maxAngle: 160,
+    minAngle: 95,   // Jos (în squat) e super relaxat
+    maxAngle: 145,  // Săritura la final nu trebuie să fie prea înaltă
     side: "both",
     countOn: "up",
     type: "reps",
