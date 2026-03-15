@@ -870,13 +870,7 @@ export default function Assistant() {
 
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity
-          style={s.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.75}
-        >
-          <Ionicons name="arrow-back" size={18} color={C.text} />
-        </TouchableOpacity>
+
         <View style={s.headerCenter}>
           <View style={s.headerIconWrap}>
             <Ionicons name="nutrition" size={17} color={C.accent} />

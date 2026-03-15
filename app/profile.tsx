@@ -54,6 +54,7 @@ interface ProgressEntry {
   date: string;
   weight: number;
   protein: number;
+  metDiet?: boolean;
 }
 
 interface UserData {
@@ -139,6 +140,22 @@ export default function Profile() {
   const consumedProtein = passData((state) => state.protein) ?? 0;
   const consumedCarbs = passData((state) => state.carbs) ?? 0;
 
+  const isDietMetToday = (plan?: UserData["plan"]) => {
+    const targetCal = Number(plan?.dailyCalories) || 0;
+    const targetProt = Number(plan?.dailyProtein) || 0;
+    if (targetCal <= 0 || targetProt <= 0) return false;
+
+    const calLower = targetCal * 0.85;
+    const calUpper = targetCal * 1.1;
+    const protLower = targetProt * 0.9;
+
+    return (
+      consumedProtein >= protLower &&
+      consumedCalories >= calLower &&
+      consumedCalories <= calUpper
+    );
+  };
+
   useEffect(() => {
     loadUserData();
     loadWorkoutLogs();
@@ -196,10 +213,12 @@ export default function Profile() {
 
     const progress = [...(userData.progress ?? [])];
     const existingIdx = progress.findIndex((p) => p.date === TODAY);
+    const todayMetDiet = isDietMetToday(userData.plan);
     const entry: ProgressEntry = {
       date: TODAY,
       weight: w,
       protein: consumedProtein,
+      metDiet: todayMetDiet,
     };
 
     if (existingIdx >= 0) {
@@ -212,11 +231,14 @@ export default function Profile() {
     yesterday.setDate(yesterday.getDate() - 1);
     const yStr = yesterday.toISOString().split("T")[0];
 
+    const yesterdayEntry = progress.find((p) => p.date === yStr);
+    const yesterdayMet = !!yesterdayEntry?.metDiet;
+
     let streak = userData.streak ?? 0;
-    if (userData.lastLogDate === yStr) {
-      streak += 1;
-    } else if (userData.lastLogDate !== TODAY) {
-      streak = 1;
+    if (todayMetDiet) {
+      streak = yesterdayMet ? streak + 1 : 1;
+    } else {
+      streak = 0;
     }
 
     const nextLastLogDate = TODAY;
@@ -333,9 +355,7 @@ export default function Profile() {
               <Ionicons name="flame" size={22} color="#F97316" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.streakCount}>
-                {streak} {streak === 1 ? "zi" : "zile"} la rand
-              </Text>
+              <Text style={s.streakCount}>streak: {streak}</Text>
               <Text style={s.streakSub}>
                 {streak === 0
                   ? "Inregistreaza greutatea azi pentru a incepe streak-ul"
