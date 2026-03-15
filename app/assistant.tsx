@@ -608,6 +608,21 @@ export default function Assistant() {
     );
   };
 
+  const clearChat = useCallback(async () => {
+    historyRef.current = [];
+    setMessages(DEFAULT_MESSAGES);
+    setUserText("");
+    setIsTyping(false);
+
+    if (!hasAsyncStorage || !userId) return;
+    try {
+      await Promise.all([
+        AsyncStorage.removeItem(chatKey(userId)),
+        AsyncStorage.removeItem(historyKey(userId)),
+      ]);
+    } catch {}
+  }, [userId]);
+
   // ── Send ───────────────────────────────────────────────────
   const send = async (text?: string) => {
     const raw = (text ?? userText).trim();
@@ -871,8 +886,17 @@ export default function Assistant() {
             <Text style={s.headerSub}>nutriție · fitness · exerciții</Text>
           </View>
         </View>
-        <View style={s.targetPill}>
-          <Text style={s.targetPillText}>{calTarget} kcal</Text>
+        <View style={s.headerRight}>
+          <View style={s.targetPill}>
+            <Text style={s.targetPillText}>{calTarget} kcal</Text>
+          </View>
+          <TouchableOpacity
+            style={s.clearBtn}
+            onPress={clearChat}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="trash-outline" size={16} color={C.text} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1049,6 +1073,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   headerIconWrap: {
     width: 36,
     height: 36,
@@ -1071,6 +1100,16 @@ const s = StyleSheet.create({
     paddingVertical: 5,
   },
   targetPillText: { fontSize: 11, fontWeight: "700", color: C.accent },
+  clearBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   chipsScroll: { maxHeight: 50, flexGrow: 0 },
   chips: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
