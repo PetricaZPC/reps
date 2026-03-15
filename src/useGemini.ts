@@ -185,12 +185,13 @@ function roundToOneDecimal(value: number): number {
 
 function limitDecimalsToOne(text: string): string {
   return text.replace(
-    /\b(-?\d+)[.,](\d{2,})\b/g,
-    (_match, intPart: string, fracPart: string) => {
+    /\b(-?\d+)([.,])(\d+)\b/g,
+    (_match, intPart: string, _sep: string, fracPart: string) => {
       const num = Number(`${intPart}.${fracPart}`);
-      if (Number.isNaN(num)) return `${intPart}.${fracPart}`;
-      const rounded = roundToOneDecimal(num).toString().split(".");
-      return rounded[1] ? `${rounded[0]},${rounded[1]}` : rounded[0];
+      if (!Number.isFinite(num)) return `${intPart}.${fracPart}`;
+      const rounded = roundToOneDecimal(num);
+      const fixed = rounded % 1 === 0 ? `${rounded}.0` : rounded.toString();
+      return fixed;
     },
   );
 }
