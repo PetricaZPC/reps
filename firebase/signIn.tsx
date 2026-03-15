@@ -18,7 +18,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Svg, { Rect, Text as SvgText } from "react-native-svg";
 import { Gemini } from "../src/useGemini";
 import { auth, db } from "./firebaseConfig";
 
@@ -40,22 +39,9 @@ const C = {
 // ─── REPS Icon ──────────────────────────────────────────────
 function RepsIcon() {
   return (
-    <Svg width={64} height={64} viewBox="0 0 64 64">
-      <Rect width={64} height={64} rx={16} fill="#0F0F10" />
-      <SvgText
-        x={32}
-        y={32}
-        fill="white"
-        fontSize={20}
-        fontWeight="900"
-        fontFamily="Arial Black, Helvetica Neue, sans-serif"
-        textAnchor="middle"
-        alignmentBaseline="central"
-        letterSpacing={1}
-      >
-        REPS
-      </SvgText>
-    </Svg>
+    <View style={s.repsIconBox}>
+      <Text style={s.repsIconText}>REPS</Text>
+    </View>
   );
 }
 
@@ -245,22 +231,9 @@ export default function SignIn() {
           {/* Modal header */}
           <View style={s.modalHeader}>
             <View style={s.modalIconWrap}>
-              <Svg width={20} height={20} viewBox="0 0 64 64">
-                <Rect width={64} height={64} rx={16} fill="#0F0F10" />
-                <SvgText
-                  x={32}
-                  y={32}
-                  fill="white"
-                  fontSize={20}
-                  fontWeight="900"
-                  fontFamily="Arial Black, Helvetica Neue, sans-serif"
-                  textAnchor="middle"
-                  alignmentBaseline="central"
-                  letterSpacing={1}
-                >
-                  REPS
-                </SvgText>
-              </Svg>
+              <View style={s.repsMiniBox}>
+                <Text style={s.repsMiniText}>REPS</Text>
+              </View>
             </View>
             <View>
               <Text style={s.modalTitle}>Completează profilul</Text>
@@ -359,6 +332,34 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 36,
     gap: 14,
+  },
+  repsIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: "#0F0F10",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  repsIconText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  repsMiniBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#0F0F10",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  repsMiniText: {
+    color: "#fff",
+    fontSize: 7,
+    fontWeight: "900",
+    letterSpacing: 0.5,
   },
   title: {
     fontSize: 26,

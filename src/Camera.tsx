@@ -1,18 +1,25 @@
-import { RNMediapipe } from "@thinksys/react-native-mediapipe";
-import { useCameraPermissions } from "expo-camera";
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Dimensions,
-  Platform,
-  Pressable,
-  StatusBar,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Dimensions, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ExerciseConfig, calculateAngle, landmarkIndexMap } from "./exercises";
 import SkeletonOverlay from "./skeletonOverlay";
+
+function getExpoCamera() {
+  try {
+    const cameraModule = require("expo-camera");
+    return cameraModule?.default ?? cameraModule;
+  } catch {
+    return null;
+  }
+}
+function getMediapipeView() {
+  try {
+    const mediapipeModule = require("@thinksys/react-native-mediapipe");
+    return mediapipeModule?.RNMediapipe ?? null;
+  } catch {
+    return null;
+  }
+}
 
 const { width, height } = Dimensions.get("window");
 
@@ -33,7 +40,10 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class MediapipeErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class MediapipeErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -62,7 +72,13 @@ export default function Camera({
   const insets = useSafeAreaInsets();
   const safeTop = insets.top + 8;
 
-  const [permission, requestPermission] = useCameraPermissions();
+  const expoCamera = getExpoCamera();
+  const hasExpoCamera = !!expoCamera?.useCameraPermissions;
+  const [permission, requestPermission] = hasExpoCamera
+    ? expoCamera.useCameraPermissions()
+    : ([{ granted: true } as any, async () => ({ granted: false })] as const);
+  const MediapipeView = getMediapipeView();
+  const hasMediapipe = !!MediapipeView;
   const [reps, setReps] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [started, setStarted] = useState(false);
@@ -131,7 +147,10 @@ export default function Camera({
     }
 
     let landmarkArray: any[] | null = null;
-    if (Array.isArray(parsed.worldLandmarks) && parsed.worldLandmarks.length > 0) {
+    if (
+      Array.isArray(parsed.worldLandmarks) &&
+      parsed.worldLandmarks.length > 0
+    ) {
       landmarkArray = parsed.worldLandmarks;
     } else if (Array.isArray(parsed.landmarks) && parsed.landmarks.length > 0) {
       landmarkArray = parsed.landmarks;
@@ -164,10 +183,17 @@ export default function Camera({
     // Folosim 2D pentru check vizibilitate, 3D pentru calculul unghiului
     const MIN_VISIBILITY = 0.5;
     if (landmarks2D) {
-      const points2D = exercise.landmarks.map((name: string) => landmarkObj2D[name]);
-      const allVisible = points2D.length > 0 && points2D.every(
-        (p: any) => p && typeof p.x === "number" && (p.visibility ?? 0) >= MIN_VISIBILITY
+      const points2D = exercise.landmarks.map(
+        (name: string) => landmarkObj2D[name],
       );
+      const allVisible =
+        points2D.length > 0 &&
+        points2D.every(
+          (p: any) =>
+            p &&
+            typeof p.x === "number" &&
+            (p.visibility ?? 0) >= MIN_VISIBILITY,
+        );
       if (!allVisible) {
         // Resetăm upPosRef — altfel când reintri în cadru într-o poziție
         // intermediară s-ar putea număra o rep falsă
@@ -177,7 +203,11 @@ export default function Camera({
     }
 
     const points = exercise.landmarks.map((name: string) => landmarkObj[name]);
-    if (!points.length || !points.every((p: any) => p && typeof p.x === "number")) return;
+    if (
+      !points.length ||
+      !points.every((p: any) => p && typeof p.x === "number")
+    )
+      return;
 
     const angle = calculateAngle(points[0], points[1], points[2]);
 
@@ -186,14 +216,22 @@ export default function Camera({
 
     if (landmarks2D) {
       exercise.formRules.forEach((rule) => {
-        const rulePoints = rule.landmarks.map((name: string) => landmarkObj2D[name]);
+        const rulePoints = rule.landmarks.map(
+          (name: string) => landmarkObj2D[name],
+        );
         if (!rulePoints.every((p: any) => p && typeof p.x === "number")) return;
 
-        const ruleAngle = calculateAngle(rulePoints[0], rulePoints[1], rulePoints[2]);
+        const ruleAngle = calculateAngle(
+          rulePoints[0],
+          rulePoints[1],
+          rulePoints[2],
+        );
 
         let violated = false;
-        if (rule.minAngle !== undefined && ruleAngle < rule.minAngle) violated = true;
-        if (rule.maxAngle !== undefined && ruleAngle > rule.maxAngle) violated = true;
+        if (rule.minAngle !== undefined && ruleAngle < rule.minAngle)
+          violated = true;
+        if (rule.maxAngle !== undefined && ruleAngle > rule.maxAngle)
+          violated = true;
 
         if (violated) {
           if (!formViolationTime.current[rule.message]) {
@@ -223,7 +261,9 @@ export default function Camera({
     }
 
     if (exercise.type === "timed") {
-      const mainPoints = exercise.landmarks.map((name: string) => landmarkObj[name]);
+      const mainPoints = exercise.landmarks.map(
+        (name: string) => landmarkObj[name],
+      );
       const pointsVisible = mainPoints.every(
         (p: any) => p && typeof p.x === "number" && (p.visibility ?? 1) > 0.3,
       );
@@ -250,7 +290,8 @@ export default function Camera({
     if (violations.length > 0) return;
 
     if (exercise.countOn === "up") {
-      if (angle < exercise.minAngle && !upPosRef.current) upPosRef.current = true;
+      if (angle < exercise.minAngle && !upPosRef.current)
+        upPosRef.current = true;
       if (angle > exercise.maxAngle && upPosRef.current) {
         if (now - lastRepTime.current > 300) {
           upPosRef.current = false;
@@ -261,7 +302,8 @@ export default function Camera({
         }
       }
     } else {
-      if (angle > exercise.maxAngle && !upPosRef.current) upPosRef.current = true;
+      if (angle > exercise.maxAngle && !upPosRef.current)
+        upPosRef.current = true;
       if (angle < exercise.minAngle && upPosRef.current) {
         if (now - lastRepTime.current > 300) {
           upPosRef.current = false;
@@ -282,38 +324,123 @@ export default function Camera({
 
   // ── Permission states ────────────────────────────────────
   const cameraFallback = (
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "#000", paddingHorizontal: 24 }}>
-      <Text style={{ color: "#fff", fontSize: 18, textAlign: "center", marginBottom: 12 }}>
-        Camera tracking is not available on this device.
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#000",
+        paddingHorizontal: 24,
+      }}
+    >
+      <Text
+        style={{
+          color: "#fff",
+          fontSize: 18,
+          textAlign: "center",
+          marginBottom: 12,
+        }}
+      >
+        Camera tracking is not available in this build.
       </Text>
-      <TouchableOpacity onPress={onExit} style={{ backgroundColor: "#4F6EF7", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+      <Text
+        style={{
+          color: "#8A8FA8",
+          fontSize: 13,
+          textAlign: "center",
+          marginBottom: 16,
+          lineHeight: 18,
+        }}
+      >
+        Rebuild the app natively after installing camera modules.
+      </Text>
+      <TouchableOpacity
+        onPress={onExit}
+        style={{
+          backgroundColor: "#4F6EF7",
+          paddingHorizontal: 24,
+          paddingVertical: 12,
+          borderRadius: 12,
+        }}
+      >
         <Text style={{ color: "#fff", fontWeight: "600" }}>Înapoi</Text>
       </TouchableOpacity>
     </View>
   );
 
+  if (!hasExpoCamera) {
+    return cameraFallback;
+  }
+
+  if (!hasMediapipe) {
+    return cameraFallback;
+  }
   if (!permission) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
-        <Text style={{ color: "#fff", fontSize: 16 }}>Se încarcă camera...</Text>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#000",
+        }}
+      >
+        <Text style={{ color: "#fff", fontSize: 16 }}>
+          Se încarcă camera...
+        </Text>
       </View>
     );
   }
 
   if (!permission.granted) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000", paddingHorizontal: 32 }}>
-        <Text style={{ color: "#fff", fontSize: 18, marginBottom: 8, fontWeight: "700", textAlign: "center" }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#000",
+          paddingHorizontal: 32,
+        }}
+      >
+        <Text
+          style={{
+            color: "#fff",
+            fontSize: 18,
+            marginBottom: 8,
+            fontWeight: "700",
+            textAlign: "center",
+          }}
+        >
           Permisiune cameră necesară
         </Text>
-        <Text style={{ color: "#8A8FA8", fontSize: 14, textAlign: "center", marginBottom: 28, lineHeight: 20 }}>
+        <Text
+          style={{
+            color: "#8A8FA8",
+            fontSize: 14,
+            textAlign: "center",
+            marginBottom: 28,
+            lineHeight: 20,
+          }}
+        >
           Aplicația are nevoie de acces la cameră pentru a detecta mișcările.
         </Text>
         <TouchableOpacity
           onPress={requestPermission}
-          style={{ backgroundColor: "#4F6EF7", paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14 }}
+          style={{
+            backgroundColor: "#4F6EF7",
+            paddingHorizontal: 32,
+            paddingVertical: 14,
+            borderRadius: 14,
+          }}
         >
-          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Acordă permisiunea</Text>
+          <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
+            Acordă permisiunea
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -321,9 +448,9 @@ export default function Camera({
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
-      {RNMediapipe ? (
+      {MediapipeView ? (
         <MediapipeErrorBoundary fallback={cameraFallback}>
-          <RNMediapipe
+          <MediapipeView
             width={width}
             height={height}
             face={false}
@@ -336,7 +463,7 @@ export default function Camera({
             rightLeg={false}
             leftAnkle={false}
             rightAnkle={false}
-            onLandmark={(data) => handleLandmark(data)}
+            onLandmark={(data: any) => handleLandmark(data)}
           />
         </MediapipeErrorBoundary>
       ) : (
@@ -352,30 +479,81 @@ export default function Camera({
 
       {/* ── Start screen (single mode) ── */}
       {!workoutMode && !started && (
-        <View style={{
-          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-          justifyContent: "center", alignItems: "center",
-          backgroundColor: "rgba(0,0,0,0.82)", zIndex: 30,
-          paddingHorizontal: 28,
-        }}>
-          <Text style={{ color: "#fff", fontSize: 26, fontWeight: "700", marginBottom: 10, textAlign: "center", letterSpacing: -0.5 }}>
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.82)",
+            zIndex: 30,
+            paddingHorizontal: 28,
+          }}
+        >
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 26,
+              fontWeight: "700",
+              marginBottom: 10,
+              textAlign: "center",
+              letterSpacing: -0.5,
+            }}
+          >
             {exercise.name}
           </Text>
-          <Text style={{ color: "#8A8FA8", fontSize: 14, textAlign: "center", marginBottom: 24, lineHeight: 20 }}>
+          <Text
+            style={{
+              color: "#8A8FA8",
+              fontSize: 14,
+              textAlign: "center",
+              marginBottom: 24,
+              lineHeight: 20,
+            }}
+          >
             {exercise.description}
           </Text>
-          <View style={{ backgroundColor: "rgba(249,115,22,0.15)", borderRadius: 12, padding: 12, paddingHorizontal: 20, marginBottom: 36 }}>
-            <Text style={{ color: "#F97316", fontSize: 13, textAlign: "center", fontWeight: "500" }}>
+          <View
+            style={{
+              backgroundColor: "rgba(249,115,22,0.15)",
+              borderRadius: 12,
+              padding: 12,
+              paddingHorizontal: 20,
+              marginBottom: 36,
+            }}
+          >
+            <Text
+              style={{
+                color: "#F97316",
+                fontSize: 13,
+                textAlign: "center",
+                fontWeight: "500",
+              }}
+            >
               📱 {exercise.cameraPosition}
             </Text>
           </View>
           <TouchableOpacity
             onPress={startCountdown}
-            style={{ backgroundColor: "#22C55E", paddingHorizontal: 56, paddingVertical: 16, borderRadius: 16, marginBottom: 14 }}
+            style={{
+              backgroundColor: "#22C55E",
+              paddingHorizontal: 56,
+              paddingVertical: 16,
+              borderRadius: 16,
+              marginBottom: 14,
+            }}
           >
-            <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>START</Text>
+            <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+              START
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={onExit} style={{ paddingHorizontal: 40, paddingVertical: 12 }}>
+          <TouchableOpacity
+            onPress={onExit}
+            style={{ paddingHorizontal: 40, paddingVertical: 12 }}
+          >
             <Text style={{ color: "#8A8FA8", fontSize: 15 }}>Înapoi</Text>
           </TouchableOpacity>
         </View>
@@ -383,15 +561,51 @@ export default function Camera({
 
       {/* ── Countdown ── */}
       {started && !isReady && (
-        <View style={{
-          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-          justifyContent: "center", alignItems: "center",
-          backgroundColor: "rgba(0,0,0,0.75)", zIndex: 30,
-        }}>
-          <Text style={{ color: "#8A8FA8", fontSize: 15, marginBottom: 6 }}>{exercise.name}</Text>
-          <Text style={{ color: "#fff", fontSize: 22, fontWeight: "600", marginBottom: 10 }}>Pregătește-te!</Text>
-          <Text style={{ color: "#F97316", fontSize: 96, fontWeight: "700", lineHeight: 100 }}>{countdown}</Text>
-          <Text style={{ color: "#8A8FA8", fontSize: 13, marginTop: 20, textAlign: "center", paddingHorizontal: 32 }}>
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.75)",
+            zIndex: 30,
+          }}
+        >
+          <Text style={{ color: "#8A8FA8", fontSize: 15, marginBottom: 6 }}>
+            {exercise.name}
+          </Text>
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 22,
+              fontWeight: "600",
+              marginBottom: 10,
+            }}
+          >
+            Pregătește-te!
+          </Text>
+          <Text
+            style={{
+              color: "#F97316",
+              fontSize: 96,
+              fontWeight: "700",
+              lineHeight: 100,
+            }}
+          >
+            {countdown}
+          </Text>
+          <Text
+            style={{
+              color: "#8A8FA8",
+              fontSize: 13,
+              marginTop: 20,
+              textAlign: "center",
+              paddingHorizontal: 32,
+            }}
+          >
             📱 {exercise.cameraPosition}
           </Text>
         </View>
@@ -399,18 +613,26 @@ export default function Camera({
 
       {/* ── Form warning (timed exercises) ── */}
       {isReady && exercise.type === "timed" && formWarning && (
-        <View style={{
-          position: "absolute",
-          // safeTop asigură că nu intră sub bara de status/notch
-          top: safeTop + (workoutMode ? 72 : 72),
-          left: 16, right: 16,
-          backgroundColor: "rgba(239,68,68,0.92)",
-          borderRadius: 12, padding: 14,
-          zIndex: 20, alignItems: "center",
-          flexDirection: "row", gap: 8,
-        }}>
+        <View
+          style={{
+            position: "absolute",
+            // safeTop asigură că nu intră sub bara de status/notch
+            top: safeTop + (workoutMode ? 72 : 72),
+            left: 16,
+            right: 16,
+            backgroundColor: "rgba(239,68,68,0.92)",
+            borderRadius: 12,
+            padding: 14,
+            zIndex: 20,
+            alignItems: "center",
+            flexDirection: "row",
+            gap: 8,
+          }}
+        >
           <Text style={{ fontSize: 18 }}>⚠️</Text>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Corectează postura!</Text>
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+            Corectează postura!
+          </Text>
         </View>
       )}
 
@@ -418,18 +640,20 @@ export default function Camera({
       {!workoutMode && (
         <>
           {/* Exercise name — top left, respectă safeTop */}
-          <View style={{
-            position: "absolute",
-            top: safeTop,
-            left: 16,
-            backgroundColor: "rgba(247,248,250,0.9)",
-            borderRadius: 12,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            zIndex: 20,
-            borderWidth: 1,
-            borderColor: "rgba(255,255,255,0.9)",
-          }}>
+          <View
+            style={{
+              position: "absolute",
+              top: safeTop,
+              left: 16,
+              backgroundColor: "rgba(247,248,250,0.9)",
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              zIndex: 20,
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.9)",
+            }}
+          >
             <Text style={{ color: "#0F0F10", fontWeight: "700", fontSize: 14 }}>
               {exercise.name}
             </Text>
@@ -442,43 +666,58 @@ export default function Camera({
               position: "absolute",
               top: safeTop,
               right: 16,
-              width: 36, height: 36,
+              width: 36,
+              height: 36,
               backgroundColor: "rgba(247,248,250,0.9)",
               borderRadius: 10,
-              alignItems: "center", justifyContent: "center",
+              alignItems: "center",
+              justifyContent: "center",
               zIndex: 100,
               borderWidth: 1,
               borderColor: "rgba(255,255,255,0.9)",
             }}
           >
-            <Text style={{ color: "#0F0F10", fontWeight: "700", fontSize: 16 }}>✕</Text>
+            <Text style={{ color: "#0F0F10", fontWeight: "700", fontSize: 16 }}>
+              ✕
+            </Text>
           </TouchableOpacity>
 
           {/* Rep / time counter — centrat sus, sub exercise name */}
           {isReady && (
-            <View style={{
-              position: "absolute",
-              top: safeTop + 52,   // sub butonul de exit
-              left: 0, right: 0,
-              alignItems: "center",
-              zIndex: 20,
-            }}>
-              <View style={{
-                backgroundColor: exercise.type === "timed" && plankActive.current
-                  ? "rgba(34,197,94,0.9)"
-                  : "rgba(247,248,250,0.9)",
-                paddingHorizontal: 24,
-                paddingVertical: 12,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.9)",
-              }}>
-                <Text style={{
-                  color: exercise.type === "timed" && plankActive.current ? "#fff" : "#0F0F10",
-                  fontWeight: "700",
-                  fontSize: 28,
-                  letterSpacing: -0.5,
-                }}>
+            <View
+              style={{
+                position: "absolute",
+                top: safeTop + 52, // sub butonul de exit
+                left: 0,
+                right: 0,
+                alignItems: "center",
+                zIndex: 20,
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor:
+                    exercise.type === "timed" && plankActive.current
+                      ? "rgba(34,197,94,0.9)"
+                      : "rgba(247,248,250,0.9)",
+                  paddingHorizontal: 24,
+                  paddingVertical: 12,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.9)",
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      exercise.type === "timed" && plankActive.current
+                        ? "#fff"
+                        : "#0F0F10",
+                    fontWeight: "700",
+                    fontSize: 28,
+                    letterSpacing: -0.5,
+                  }}
+                >
                   {exercise.type === "timed"
                     ? `⏱ ${formatTime(seconds)}`
                     : `${reps} reps`}
@@ -489,15 +728,39 @@ export default function Camera({
 
           {/* Form feedback — bottom */}
           {isReady && formFeedback.length > 0 && (
-            <View style={{ position: "absolute", bottom: 40, left: 16, right: 16, zIndex: 20, gap: 8 }}>
+            <View
+              style={{
+                position: "absolute",
+                bottom: 40,
+                left: 16,
+                right: 16,
+                zIndex: 20,
+                gap: 8,
+              }}
+            >
               {formFeedback.map((msg, idx) => (
-                <View key={idx} style={{
-                  backgroundColor: "rgba(239,68,68,0.9)",
-                  borderRadius: 12, padding: 12,
-                  flexDirection: "row", alignItems: "center", gap: 8,
-                }}>
+                <View
+                  key={idx}
+                  style={{
+                    backgroundColor: "rgba(239,68,68,0.9)",
+                    borderRadius: 12,
+                    padding: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
                   <Text style={{ fontSize: 16 }}>⚠️</Text>
-                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14, flex: 1 }}>{msg}</Text>
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontWeight: "700",
+                      fontSize: 14,
+                      flex: 1,
+                    }}
+                  >
+                    {msg}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -507,15 +770,39 @@ export default function Camera({
 
       {/* ── Workout mode form feedback ── */}
       {workoutMode && isReady && formFeedback.length > 0 && (
-        <View style={{ position: "absolute", bottom: 100, left: 16, right: 16, zIndex: 20, gap: 6 }}>
+        <View
+          style={{
+            position: "absolute",
+            bottom: 100,
+            left: 16,
+            right: 16,
+            zIndex: 20,
+            gap: 6,
+          }}
+        >
           {formFeedback.map((msg, idx) => (
-            <View key={idx} style={{
-              backgroundColor: "rgba(239,68,68,0.9)",
-              borderRadius: 12, padding: 10,
-              flexDirection: "row", alignItems: "center", gap: 8,
-            }}>
+            <View
+              key={idx}
+              style={{
+                backgroundColor: "rgba(239,68,68,0.9)",
+                borderRadius: 12,
+                padding: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
               <Text style={{ fontSize: 14 }}>⚠️</Text>
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13, flex: 1 }}>{msg}</Text>
+              <Text
+                style={{
+                  color: "#fff",
+                  fontWeight: "700",
+                  fontSize: 13,
+                  flex: 1,
+                }}
+              >
+                {msg}
+              </Text>
             </View>
           ))}
         </View>

@@ -29,6 +29,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow reps to access your photos",
+          "cameraPermission": "Allow reps to access your camera"
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Allow reps to access your camera",
