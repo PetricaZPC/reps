@@ -5,7 +5,7 @@ async function callGemini(prompt: string, timeoutMs = 20000): Promise<string> {
   if (!API_KEY) return "Error: API Key is missing. Check your .env file.";
 
   const controller = new AbortController();
-  const timeoutId  = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(
@@ -48,7 +48,7 @@ export interface WorkoutLogEntry {
   presetId?: string;
   presetName: string;
   difficulty: string;
-  completedAt: string;   // ISO string
+  completedAt: string; // ISO string
   completedSets: number;
   totalSets: number;
 }
@@ -107,9 +107,10 @@ ${
           const dateStr = isNaN(date.getTime())
             ? w.completedAt
             : date.toLocaleDateString("ro-RO");
-          const pct = w.totalSets > 0
-            ? Math.round((w.completedSets / w.totalSets) * 100)
-            : 0;
+          const pct =
+            w.totalSets > 0
+              ? Math.round((w.completedSets / w.totalSets) * 100)
+              : 0;
           return `  • ${dateStr}: ${w.presetName} (${w.difficulty}) — ${pct}% completat`;
         })
         .join("\n")
@@ -151,8 +152,9 @@ NUTRITION_DATA:{"calories":0,"protein":0,"carbs":0,"fat":0,"vitamins":[],"minera
 `;
 
 export interface SmartResponse {
-  text: string;           // Textul afișat utilizatorului
-  nutritionData?: {       // Prezent doar când s-a calculat nutriție
+  text: string; // Textul afișat utilizatorului
+  nutritionData?: {
+    // Prezent doar când s-a calculat nutriție
     calories: number;
     protein: number;
     carbs: number;
@@ -160,6 +162,28 @@ export interface SmartResponse {
     vitamins: string[];
     minerals: string[];
   };
+}
+
+function parseAssistantResponse(raw: string): SmartResponse {
+  const nutritionMatch = raw.match(/NUTRITION_DATA:(\{.*?\})/s);
+  let nutritionData: SmartResponse["nutritionData"] | undefined;
+
+  if (nutritionMatch) {
+    try {
+      const parsed = JSON.parse(nutritionMatch[1]);
+      nutritionData = {
+        calories: Number(parsed.calories) || 0,
+        protein: Number(parsed.protein) || 0,
+        carbs: Number(parsed.carbs) || 0,
+        fat: Number(parsed.fat) || 0,
+        vitamins: Array.isArray(parsed.vitamins) ? parsed.vitamins : [],
+        minerals: Array.isArray(parsed.minerals) ? parsed.minerals : [],
+      };
+    } catch {}
+  }
+
+  const cleanText = raw.replace(/\nNUTRITION_DATA:\{.*?\}/s, "").trim();
+  return { text: cleanText, nutritionData };
 }
 
 export async function askAssistant(
@@ -173,7 +197,7 @@ export async function askAssistant(
 
     // Gemini nu are "system" separat în v1beta — îl injectăm ca primul turn "model"
     const turns = [
-      { role: "user",  parts: [{ text: "Cine ești și ce poți face?" }] },
+      { role: "user", parts: [{ text: "Cine ești și ce poți face?" }] },
       { role: "model", parts: [{ text: systemBlock }] },
       // istoricul conversației
       ...history.map((h) => ({
@@ -201,28 +225,63 @@ export async function askAssistant(
 
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    // Extrage blocul NUTRITION_DATA dacă există
-    const nutritionMatch = raw.match(/NUTRITION_DATA:(\{.*?\})/s);
-    let nutritionData: SmartResponse["nutritionData"] | undefined;
-
-    if (nutritionMatch) {
-      try {
-        const parsed = JSON.parse(nutritionMatch[1]);
-        nutritionData = {
-          calories: Number(parsed.calories) || 0,
-          protein:  Number(parsed.protein)  || 0,
-          carbs:    Number(parsed.carbs)     || 0,
-          fat:      Number(parsed.fat)       || 0,
-          vitamins: Array.isArray(parsed.vitamins) ? parsed.vitamins : [],
-          minerals: Array.isArray(parsed.minerals) ? parsed.minerals : [],
-        };
-      } catch {}
+    return parseAssistantResponse(raw);
+  } catch (err: any) {
+    if (err.name === "AbortError" || err.message?.includes("timeout")) {
+      return { text: "Eroare: conexiune lentă. Încearcă din nou." };
     }
+    return { text: `Eroare: ${err.message ?? String(err)}` };
+  }
+}
 
-    // Curăță textul de blocul NUTRITION_DATA
-    const cleanText = raw.replace(/\nNUTRITION_DATA:\{.*?\}/s, "").trim();
+export async function askAssistantWithImage(
+  userMessage: string,
+  ctx: AssistantContext,
+  imageBase64: string,
+  mimeType: string,
+  history: { role: "user" | "model"; text: string }[] = [],
+): Promise<SmartResponse> {
+  try {
+    const systemBlock = SYSTEM_PROMPT(ctx);
 
-    return { text: cleanText, nutritionData };
+    const turns = [
+      { role: "user", parts: [{ text: "Cine ești și ce poți face?" }] },
+      { role: "model", parts: [{ text: systemBlock }] },
+      ...history.map((h) => ({
+        role: h.role,
+        parts: [{ text: h.text }],
+      })),
+      {
+        role: "user",
+        parts: [
+          { text: userMessage },
+          {
+            inline_data: {
+              mime_type: mimeType || "image/jpeg",
+              data: imageBase64,
+            },
+          },
+        ],
+      },
+    ];
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: turns,
+          generationConfig: { temperature: 0.7 },
+        }),
+      },
+    );
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    return parseAssistantResponse(raw);
   } catch (err: any) {
     if (err.name === "AbortError" || err.message?.includes("timeout")) {
       return { text: "Eroare: conexiune lentă. Încearcă din nou." };
@@ -240,29 +299,51 @@ export function extractCalories(responseText: string): {
   minerals: string[];
 } {
   try {
-    const clean = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
-    const json  = JSON.parse(clean);
-    let cal = 0, prot = 0, carb = 0;
-    const vit = new Set<string>(), min = new Set<string>();
+    const clean = responseText
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+    const json = JSON.parse(clean);
+    let cal = 0,
+      prot = 0,
+      carb = 0;
+    const vit = new Set<string>(),
+      min = new Set<string>();
 
     const pickArr = (v: unknown): string[] => {
-      if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
-      if (typeof v === "string") return v.split(/,|;/).map((x) => x.trim()).filter(Boolean);
+      if (Array.isArray(v))
+        return v.map((x) => String(x).trim()).filter(Boolean);
+      if (typeof v === "string")
+        return v
+          .split(/,|;/)
+          .map((x) => x.trim())
+          .filter(Boolean);
       return [];
     };
     const proc = (item: any) => {
-      cal  += Number(item?.calorii  ?? item?.calories)                          || 0;
-      prot += Number(item?.proteine ?? item?.protein)                           || 0;
-      carb += Number(item?.carbohidrati ?? item?.carbs ?? item?.carbohydrates)  || 0;
+      cal += Number(item?.calorii ?? item?.calories) || 0;
+      prot += Number(item?.proteine ?? item?.protein) || 0;
+      carb +=
+        Number(item?.carbohidrati ?? item?.carbs ?? item?.carbohydrates) || 0;
       pickArr(item?.vitamine ?? item?.vitamins).forEach((v) => vit.add(v));
       pickArr(item?.minerale ?? item?.minerals).forEach((m) => min.add(m));
     };
-    const items = Array.isArray(json) ? json
-      : Array.isArray(json?.items)    ? json.items
-      : Array.isArray(json?.alimente) ? json.alimente
-      : null;
-    if (items) items.forEach(proc); else if (json) proc(json);
-    return { calories: cal, protein: prot, carbs: carb, vitamins: [...vit], minerals: [...min] };
+    const items = Array.isArray(json)
+      ? json
+      : Array.isArray(json?.items)
+        ? json.items
+        : Array.isArray(json?.alimente)
+          ? json.alimente
+          : null;
+    if (items) items.forEach(proc);
+    else if (json) proc(json);
+    return {
+      calories: cal,
+      protein: prot,
+      carbs: carb,
+      vitamins: [...vit],
+      minerals: [...min],
+    };
   } catch {
     return { calories: 0, protein: 0, carbs: 0, vitamins: [], minerals: [] };
   }
