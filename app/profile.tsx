@@ -49,6 +49,13 @@ const C = {
 const TODAY = new Date().toISOString().split("T")[0];
 const screenWidth = Dimensions.get("window").width;
 
+const formatOneDecimal = (value: number | string) => {
+  const num = typeof value === "string" ? Number(value) : value;
+  if (!Number.isFinite(num)) return String(value);
+  const rounded = Math.round(num * 10) / 10;
+  return rounded % 1 === 0 ? `${rounded}.0` : rounded.toString();
+};
+
 // Types
 interface ProgressEntry {
   date: string;
@@ -111,10 +118,12 @@ function MacroBar({
       <View style={s.macroBarHeader}>
         <Text style={s.macroBarLabel}>{label}</Text>
         <Text style={s.macroBarValue}>
-          <Text style={{ color, fontWeight: "700" }}>{value}</Text>
+          <Text style={{ color, fontWeight: "700" }}>
+            {formatOneDecimal(value)}
+          </Text>
           <Text style={{ color: C.textMuted }}>
-            {" "}
-            / {target} {unit}
+            {" / "}
+            {formatOneDecimal(target)} {unit}
           </Text>
         </Text>
       </View>
@@ -208,6 +217,7 @@ export default function Profile() {
       Alert.alert("Eroare", "Introdu o greutate valida.");
       return;
     }
+    const roundedWeight = Math.round(w * 10) / 10;
     const user = auth.currentUser;
     if (!user || !userData) return;
 
@@ -216,7 +226,7 @@ export default function Profile() {
     const todayMetDiet = isDietMetToday(userData.plan);
     const entry: ProgressEntry = {
       date: TODAY,
-      weight: w,
+      weight: roundedWeight,
       protein: consumedProtein,
       metDiet: todayMetDiet,
     };
@@ -257,7 +267,10 @@ export default function Profile() {
         streak,
         lastLogDate: nextLastLogDate,
       });
-      Alert.alert("Greutate salvată", `${w} kg a fost salvat pentru azi.`);
+      Alert.alert(
+        "Greutate salvată",
+        `${formatOneDecimal(roundedWeight)} kg a fost salvat pentru azi.`,
+      );
     } catch {
       Alert.alert("Eroare", "Nu am putut salva greutatea.");
     } finally {
@@ -287,12 +300,12 @@ export default function Profile() {
   const heightCm = userData.height ? parseFloat(userData.height) : undefined;
   const bmi =
     latestWeight && heightCm
-      ? (latestWeight / Math.pow(heightCm / 100, 2)).toFixed(1)
+      ? formatOneDecimal(latestWeight / Math.pow(heightCm / 100, 2))
       : undefined;
 
   const recent = [...progress].slice(-7);
   const chartLabels = recent.map((p) => p.date.slice(5));
-  const weightData = recent.map((p) => p.weight);
+  const weightData = recent.map((p) => Math.round(p.weight * 10) / 10);
   const hasChartData = recent.length >= 2;
 
   const dailyCalories = Number(userData.plan?.dailyCalories) || 2000;
@@ -355,7 +368,7 @@ export default function Profile() {
               <Ionicons name="flame" size={22} color="#F97316" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.streakCount}>streak: {streak}</Text>
+              <Text style={s.streakCount}>Streak: {streak}</Text>
               <Text style={s.streakSub}>
                 {streak === 0
                   ? "Inregistreaza greutatea azi pentru a incepe streak-ul"
@@ -394,13 +407,13 @@ export default function Profile() {
             <View style={s.snapshotItem}>
               <Text style={s.snapshotLabel}>Greutate</Text>
               <Text style={s.snapshotValue}>
-                {latestWeight ? `${latestWeight.toFixed(1)} kg` : "–"}
+                {latestWeight ? `${formatOneDecimal(latestWeight)} kg` : "–"}
               </Text>
             </View>
             <View style={s.snapshotItem}>
               <Text style={s.snapshotLabel}>Țintă</Text>
               <Text style={s.snapshotValue}>
-                {targetWeight ? `${targetWeight.toFixed(1)} kg` : "–"}
+                {targetWeight ? `${formatOneDecimal(targetWeight)} kg` : "–"}
               </Text>
             </View>
             <View style={s.snapshotItem}>
@@ -455,18 +468,24 @@ export default function Profile() {
           <View style={s.remainRow}>
             <View style={[s.remainChip, { backgroundColor: "#FFF0E8" }]}>
               <Text style={[s.remainChipText, { color: "#F97316" }]}>
-                {Math.max(dailyCalories - consumedCalories, 0)} kcal ramase
+                {formatOneDecimal(
+                  Math.max(dailyCalories - consumedCalories, 0),
+                )} kcal ramase
               </Text>
             </View>
             <View style={[s.remainChip, { backgroundColor: C.accentLight }]}>
               <Text style={[s.remainChipText, { color: C.accent }]}>
-                {Math.max(dailyProtein - consumedProtein, 0)}g proteina ramasa
+                {formatOneDecimal(
+                  Math.max(dailyProtein - consumedProtein, 0),
+                )}g proteina ramasa
               </Text>
             </View>
             {dailyCarbs !== undefined && (
               <View style={[s.remainChip, { backgroundColor: "#ECFDF3" }]}>
                 <Text style={[s.remainChipText, { color: "#15803D" }]}>
-                  {Math.max(dailyCarbs - consumedCarbs, 0)}g carbo ramasi
+                  {formatOneDecimal(
+                    Math.max(dailyCarbs - consumedCarbs, 0),
+                  )}g carbo ramasi
                 </Text>
               </View>
             )}
@@ -476,7 +495,7 @@ export default function Profile() {
             <View style={s.specialNoteRow}>
               {dailyFat !== undefined && (
                 <Text style={s.specialNoteText}>
-                  Grăsimi țintă: {dailyFat} g
+                  Grăsimi țintă: {formatOneDecimal(dailyFat)} g
                 </Text>
               )}
               {dailyVitamins ? (
@@ -555,10 +574,14 @@ export default function Profile() {
                 <Text style={s.specialLine}>Condiție: {healthCondition}</Text>
               ) : null}
               {dailyCarbs !== undefined && (
-                <Text style={s.specialLine}>Carbohidrați: {dailyCarbs} g</Text>
+                <Text style={s.specialLine}>
+                  Carbohidrați: {formatOneDecimal(dailyCarbs)} g
+                </Text>
               )}
               {dailyFat !== undefined && (
-                <Text style={s.specialLine}>Grăsimi: {dailyFat} g</Text>
+                <Text style={s.specialLine}>
+                  Grăsimi: {formatOneDecimal(dailyFat)} g
+                </Text>
               )}
               {dailyVitamins ? (
                 <Text style={s.specialLine}>Vitamine: {dailyVitamins}</Text>
@@ -607,7 +630,7 @@ export default function Profile() {
               <Text style={s.todayLoggedText}>
                 Inregistrat azi:{" "}
                 <Text style={{ fontWeight: "700", color: C.text }}>
-                  {todayEntry.weight} kg
+                  {formatOneDecimal(todayEntry.weight)} kg
                 </Text>
               </Text>
             </View>
@@ -642,10 +665,10 @@ export default function Profile() {
             />
             {weightData.length >= 2 &&
               (() => {
-                const delta = (
-                  weightData[weightData.length - 1] - weightData[0]
-                ).toFixed(1);
-                const isDown = parseFloat(delta) < 0;
+                  const delta =
+                    weightData[weightData.length - 1] - weightData[0];
+                  const formattedDelta = formatOneDecimal(delta);
+                  const isDown = delta < 0;
                 return (
                   <View
                     style={[
@@ -669,7 +692,7 @@ export default function Profile() {
                       ]}
                     >
                       {isDown ? "" : "+"}
-                      {delta} kg in ultimele {recent.length} inregistrari
+                      {formattedDelta} kg in ultimele {recent.length} inregistrari
                     </Text>
                   </View>
                 );

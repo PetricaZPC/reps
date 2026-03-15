@@ -72,6 +72,13 @@ const C = {
   blob2: "#F0E8FF",
 };
 
+const formatOneDecimal = (value: number | string) => {
+  const num = typeof value === "string" ? Number(value) : value;
+  if (!Number.isFinite(num)) return String(value);
+  const rounded = Math.round(num * 10) / 10;
+  return rounded % 1 === 0 ? `${rounded}.0` : rounded.toString();
+};
+
 // ─── Types ────────────────────────────────────────────────────
 interface Message {
   from: "user" | "ai";
@@ -138,25 +145,25 @@ function NutritionCard({
         {[
           {
             label: "kcal",
-            value: data.calories,
+            value: formatOneDecimal(data.calories),
             color: C.warning,
             bg: C.warningLight,
           },
           {
             label: "prot",
-            value: `${data.protein}g`,
+            value: `${formatOneDecimal(data.protein)}g`,
             color: C.accent,
             bg: C.accentLight,
           },
           {
             label: "carbs",
-            value: `${data.carbs}g`,
+            value: `${formatOneDecimal(data.carbs)}g`,
             color: "#A855F7",
             bg: "#F3E8FF",
           },
           {
             label: "fat",
-            value: `${data.fat}g`,
+            value: `${formatOneDecimal(data.fat)}g`,
             color: "#64748B",
             bg: "#F1F5F9",
           },
@@ -173,13 +180,13 @@ function NutritionCard({
         <ProgressRow
           label="Calorii azi"
           pct={calPct}
-          left={`${calLeft} kcal rămase`}
+          left={`${formatOneDecimal(calLeft)} kcal rămase`}
           color={C.warning}
         />
         <ProgressRow
           label="Proteine azi"
           pct={protPct}
-          left={`${protLeft}g rămase`}
+          left={`${formatOneDecimal(protLeft)}g rămase`}
           color={C.accent}
         />
       </View>
@@ -235,8 +242,13 @@ function NutritionCard({
             </View>
 
             <Text style={nc.adjustedText}>
-              Se vor adăuga: {adjustedCalories} kcal, {adjustedProtein}g
-              protein, {adjustedCarbs}g carbs, {adjustedFat}g fat
+              Se vor adăuga: {formatOneDecimal(adjustedCalories)} kcal,
+              {" "}
+              {formatOneDecimal(adjustedProtein)}g protein,
+              {" "}
+              {formatOneDecimal(adjustedCarbs)}g carbs,
+              {" "}
+              {formatOneDecimal(adjustedFat)}g fat
             </Text>
 
             <TouchableOpacity
