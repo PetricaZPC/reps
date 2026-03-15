@@ -139,6 +139,8 @@ CAPACITĂȚILE TALE:
 
 6. SFATURI FITNESS/NUTRIȚIE — slăbit, masă musculară, suplimente, recuperare, somn, hidratare, macronutrienți.
 
+NOTĂ: Pentru orice mesaj legat de mâncare (calcul direct sau rețetă generată), include întotdeauna valorile nutriționale și linia NUTRITION_DATA ca să pot întreba dacă a mâncat toată porția.
+
 REGULI:
 - Răspunde ÎNTOTDEAUNA în română
 - In pozele cu mancare ofera strict retete baza pe ceea ce se vede in poza, fara alte recomandari sau sfaturi. Daca nu se poate identifica mancarea, raspunde politicos ca nu poti oferi o reteta bazata pe poza.
@@ -148,7 +150,7 @@ REGULI:
 - Dacă nu e legat de nutriție/fitness, explică politicos că ești specializat pe aceste domenii
 - Nu folosi deloc markdown în răspuns: interzis '*', '**', '***', '###' și orice titluri/liste markdown.
 
-FORMAT SPECIAL — doar când calculezi nutriție dintr-un aliment/masă:
+FORMAT SPECIAL — când calculezi nutriție dintr-un aliment/masă SAU când generezi o rețetă:
 - Textul trebuie să fie ultra-scurt și să nu repete targetul sau ce a rămas. Nu repeta "Rămâne"/"target" în text.
 - Format recomandat: "Ai mâncat: <aliment> ≈X kcal, Yg prot, Zg carbs, Wg grăsimi. <scurt sfat de max 8-10 cuvinte>".
 - Nicio altă explicație; doar aceste 1-2 propoziții.
@@ -175,6 +177,13 @@ function sanitizeAssistantText(text: string): string {
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/\*+/g, "")
     .trim();
+}
+
+function appendPortionPrompt(text: string): string {
+  const prompt = "Ai mâncat toată porția? Confirmă mai jos.";
+  if (text.trim().endsWith(prompt)) return text;
+  if (text.includes(prompt)) return text;
+  return `${text}\n\n${prompt}`.trim();
 }
 
 function parseAssistantResponse(raw: string): SmartResponse {
@@ -220,7 +229,12 @@ function parseAssistantResponse(raw: string): SmartResponse {
       .replace(/```json[\s\S]*?```/gi, "")
       .trim(),
   );
-  return { text: cleanText, nutritionData };
+
+  const textWithPrompt = nutritionData
+    ? appendPortionPrompt(cleanText)
+    : cleanText;
+
+  return { text: textWithPrompt, nutritionData };
 }
 
 export async function askAssistant(
