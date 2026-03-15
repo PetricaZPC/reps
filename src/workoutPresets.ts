@@ -1,4 +1,4 @@
-import { EXERCISES } from "./exercises";
+import { EXERCISES, ExerciseConfig } from "./exercises";
 
 export interface WorkoutPreset {
   id: string;
@@ -141,14 +141,14 @@ export const getExerciseByKey = (key: string) => {
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
     minAngle: 80,
     maxAngle: 150,
-    side: "both",
-    countOn: "up",
+    side: "both" as const,
+    countOn: "up" as const,
     type: "reps" as const,
     description: "Config lipsă — verifică datele presetului.",
     cameraPosition: "Așază telefonul lateral, la nivelul umerilor.",
     muscleGroup: "fullbody" as const,
     formRules: [],
-  };
+  } as ExerciseConfig;
 };
 
 // Helper function to get all exercises in a preset

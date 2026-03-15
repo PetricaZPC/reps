@@ -1,17 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Accelerometer } from "expo-sensors";
 import { useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
-  Easing,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    Easing,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-// expo-sensors vine cu Expo — dacă nu e instalat: npx expo install expo-sensors
-import { Accelerometer } from "expo-sensors";
 import Camera from "./Camera";
 import { EXERCISES, ExerciseConfig } from "./exercises";
 import { WorkoutPreset } from "./workoutPresets";
@@ -110,8 +109,6 @@ const fallbackExercise = (key: string): ExerciseConfig => ({
 });
 
 // ─── Orientation hook ─────────────────────────────────────────
-// Citește accelerometrul și returnează un unghi animat (0 = portret, ±90 = landscape)
-// Aplicația rămâne portret — doar rotim conținutul vizual cu transform
 type DeviceOrientation = "portrait" | "landscape-left" | "landscape-right";
 
 function useDeviceRotation() {
@@ -123,9 +120,6 @@ function useDeviceRotation() {
     Accelerometer.setUpdateInterval(300);
     const sub = Accelerometer.addListener(({ x, y }) => {
       let next: DeviceOrientation = "portrait";
-      // x > 0.6 = întors spre dreapta (landscape-left din perspectiva conținutului)
-      // x < -0.6 = întors spre stânga (landscape-right)
-      // |y| > 0.7 = portret
       if (Math.abs(y) > 0.7) {
         next = "portrait";
       } else if (x > 0.6) {
@@ -133,7 +127,6 @@ function useDeviceRotation() {
       } else if (x < -0.6) {
         next = "landscape-right";
       } else {
-        // zonă intermediară — păstrăm orientarea curentă ca să nu sară
         return;
       }
 
@@ -157,8 +150,6 @@ function useDeviceRotation() {
 
   const isLandscape = orientation !== "portrait";
 
-  // transform calculat: rotim conținutul cu unghiul opus față de rotația fizică
-  // (dacă telefonul e rotit 90° dreapta, rotim UI cu -90° ca să pară drept)
   const rotate = rotateAnim.interpolate({
     inputRange: [-90, 0, 90],
     outputRange: ["-90deg", "0deg", "90deg"],
@@ -168,12 +159,8 @@ function useDeviceRotation() {
 }
 
 // ─── RotatedView ──────────────────────────────────────────────
-// Matematica corectă pentru rotate în React Native:
-// - App e portret lock, deci ecranul e mereu W × H (W < H)
-// - Vrem să rotim conținutul 90° vizual fără să schimbăm orientarea
-// - Un View de H × W rotit cu 90° va ocupa exact W × H pe ecran
-// - Ca să fie centrat, folosim alignSelf + marginTop auto / marginLeft auto
-// - Sau mai simplu: container flex:1, inner absolute centrat cu top/left calculate
+// FIX: pointerEvents="box-none" on both container views so touches
+// pass through to children and buttons work correctly
 function RotatedView({
   rotate,
   isLandscape,
@@ -184,16 +171,9 @@ function RotatedView({
   children: React.ReactNode;
 }) {
   const screen = Dimensions.get("screen");
-  // Întotdeauna W = latura mică, H = latura mare (portret)
   const W = Math.min(screen.width, screen.height);
   const H = Math.max(screen.width, screen.height);
 
-  // Landscape: inner are dimensiunile H × W
-  // După rotate(90deg), vizual ocupă W × H — exact ecranul
-  // Centrul de rotație e mijlocul inner-ului: (H/2, W/2)
-  // Ca să fie aliniat cu colțul (0,0) al ecranului:
-  //   top  = (H - W) / 2   → mută în jos cu diferența
-  //   left = (W - H) / 2   → mută spre stânga (valoare negativă)
   const innerW = isLandscape ? H : W;
   const innerH = isLandscape ? W : H;
   const topOffset = isLandscape ? (H - W) / 2 : 0;
@@ -201,9 +181,11 @@ function RotatedView({
 
   return (
     <View
+      pointerEvents="box-none"
       style={{ position: "absolute", top: 0, left: 0, width: W, height: H }}
     >
       <Animated.View
+        pointerEvents="box-none"
         style={{
           position: "absolute",
           width: innerW,
@@ -390,10 +372,8 @@ export default function WorkoutSession({
 
   // ── Exercise intro ─────────────────────────────────────────
   if (phase === "exercise_intro") {
-    // Când e landscape, aranjăm conținutul pe două coloane
     const content = isLandscape ? (
       <View style={s.twoCol}>
-        {/* Coloana stânga */}
         <View style={s.col}>
           <View style={s.stepChip}>
             <Text style={s.stepText}>
@@ -407,7 +387,6 @@ export default function WorkoutSession({
           <Text style={s.introNameSm}>{currentExercise.name}</Text>
           <Text style={s.introDescSm}>{currentExercise.description}</Text>
         </View>
-        {/* Coloana dreapta */}
         <View style={s.col}>
           <View style={s.targetChip}>
             <Ionicons name="layers-outline" size={13} color={C.accent} />
@@ -440,7 +419,6 @@ export default function WorkoutSession({
         </View>
       </View>
     ) : (
-      // Portret — layout vertical normal
       <View style={s.centered}>
         <View style={s.stepChip}>
           <Text style={s.stepText}>
@@ -488,7 +466,9 @@ export default function WorkoutSession({
         />
         <ProgressBar />
         <RotatedView rotate={rotate} isLandscape={isLandscape}>
-          {content}
+          <View pointerEvents="box-none" style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}>
+            {content}
+          </View>
         </RotatedView>
       </View>
     );
@@ -575,7 +555,9 @@ export default function WorkoutSession({
         />
         <ProgressBar />
         <RotatedView rotate={rotate} isLandscape={isLandscape}>
-          {content}
+          <View pointerEvents="box-none" style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}>
+            {content}
+          </View>
         </RotatedView>
       </View>
     );
@@ -622,7 +604,6 @@ const s = StyleSheet.create({
   progressTrack: { height: 4, backgroundColor: C.border },
   progressFill: { height: 4, backgroundColor: C.accent },
 
-  // ── Portret ──
   centered: {
     alignItems: "center",
     justifyContent: "center",
@@ -630,7 +611,6 @@ const s = StyleSheet.create({
     padding: 28,
   },
 
-  // ── Landscape — 2 coloane ──
   twoCol: {
     flexDirection: "row",
     gap: 20,
@@ -755,7 +735,6 @@ const s = StyleSheet.create({
   dangerBtn: { paddingVertical: 10, paddingHorizontal: 24 },
   dangerBtnText: { color: C.danger, fontSize: 14, fontWeight: "500" },
 
-  // Rest
   restLabel: { fontSize: 15, color: C.textMuted, fontWeight: "600" },
   timerCard: {
     backgroundColor: C.glass,
@@ -842,7 +821,6 @@ const s = StyleSheet.create({
   },
   skipBtnText: { color: C.accent, fontSize: 15, fontWeight: "700" },
 
-  // Camera HUD
   cameraProgress: {
     position: "absolute",
     top: 0,

@@ -37,7 +37,6 @@ interface Props {
 
 export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props) {
   const { width, height } = useWindowDimensions();
-
   if (!landmarks || landmarks.length === 0) return null;
 
   const getLandmarkPos = (name: keyof typeof landmarkIndexMap) => {
@@ -45,7 +44,6 @@ export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props)
     const point = landmarks[idx];
     if (!point) return null;
     return {
-      // Coordonatele MediaPipe sunt normalizate 0-1, le scalăm pe ecran
       x: point.x * width,
       y: point.y * height,
       visibility: point.visibility ?? 1,
@@ -55,14 +53,12 @@ export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props)
   const isAffected = (name: string) => affectedLandmarks.includes(name);
 
   return (
-    // viewBox = exact dimensiunile ecranului, fără distorsiune
-    // Nu mai folosim viewBox custom sau preserveAspectRatio
     <Svg
       width={width}
       height={height}
       style={{ position: "absolute", top: 0, left: 0, zIndex: 10 }}
     >
-      {/* Linii de conexiune */}
+      {/* Connection lines */}
       {CONNECTIONS.map(([from, to], idx) => {
         const p1 = getLandmarkPos(from);
         const p2 = getLandmarkPos(to);
@@ -81,7 +77,7 @@ export default function SkeletonOverlay({ landmarks, affectedLandmarks }: Props)
         );
       })}
 
-      {/* Cercuri articulații */}
+      {/* Joint circles */}
       {JOINTS.map((name) => {
         const pos = getLandmarkPos(name);
         if (!pos || pos.visibility < 0.5) return null;

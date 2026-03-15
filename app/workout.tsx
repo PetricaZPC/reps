@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { addDoc, collection, getDocs, query } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
@@ -15,7 +16,6 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
 import { auth, db } from "../firebase/firebaseConfig";
 import Camera from "../src/Camera";
 import { EXERCISES, ExerciseConfig, MuscleGroup } from "../src/exercises";
@@ -497,6 +497,11 @@ export default function Workout() {
                 name={ex?.name}
                 subtitle={ex?.muscleGroup}
                 index={idx + 1}
+                onPress={() => {
+                  if (!ex) return;
+                  setSelectedExercise(ex);
+                  setScreen("single");
+                }}
               />
             ))}
           </GroupCard>

@@ -92,9 +92,9 @@ export interface ExerciseConfig {
 export const EXERCISES: Record<string, ExerciseConfig> = {
   pushups: {
     name: "Push-ups",
-    landmarks: ["leftShoulder", "leftElbow", "leftWrist"], // Flexia brațului
-    minAngle: 70,
-    maxAngle: 170,
+    landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
+    minAngle: 85,   // Foarte relaxat
+    maxAngle: 145,  // Nu e nevoie să blochezi perfect cotul
     side: "both",
     countOn: "up",
     type: "reps",
@@ -104,8 +104,9 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
     formRules: [
       {
         landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-        minAngle: 140, // Toleranță pentru corp drept (nu toți țin core-ul perfect la 180)
-        message: "Keep your body straight! Hips too high or too low.",
+        minAngle: 100, // Toleranță extremă pentru spatele "drept" în proiecție 2D
+        maxAngle: 180,
+        message: "Atenție la bazin, încearcă să stai drept!",
         affectedLandmarks: ["leftHip"],
       },
     ],
@@ -114,63 +115,86 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   squats: {
     name: "Squats",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 60,
-    maxAngle: 175,
+    minAngle: 85,
+    maxAngle: 150,
     side: "both",
     countOn: "up",
     type: "reps",
     description: "Feet shoulder-width apart, lower until thighs are parallel",
     cameraPosition: "Place phone on the side at hip height",
     muscleGroup: "legs",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 30, // Permite o aplecare naturală severă în față
+        maxAngle: 180,
+        message: "Ține pieptul sus!",
+        affectedLandmarks: ["leftShoulder", "leftHip"],
+      },
+    ],
   },
 
   situps: {
     name: "Sit-ups",
-    landmarks: ["leftShoulder", "leftHip", "leftKnee"], // Flexia trunchiului pe picioare
-    minAngle: 60, // Sus
-    maxAngle: 150, // Jos, pe spate (am adăugat toleranță, unii au spatele ușor curbat la sol)
+    landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+    minAngle: 75,
+    maxAngle: 140,
     side: "both",
     countOn: "down",
     type: "reps",
     description: "Lie on back, raise torso toward knees, lower back down",
     cameraPosition: "Place phone on the side at ground level",
     muscleGroup: "core",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftHip", "leftKnee", "leftAnkle"],
+        minAngle: 30,
+        maxAngle: 150, 
+        message: "Ține genunchii îndoiți!",
+        affectedLandmarks: ["leftKnee"],
+      }
+    ],
   },
 
   lunges: {
     name: "Lunges",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 60,
-    maxAngle: 170,
+    minAngle: 80,
+    maxAngle: 155,
     side: "left",
     countOn: "up",
     type: "reps",
-    description:
-      "Step forward, lower back knee toward ground, return to standing",
+    description: "Step forward, lower back knee toward ground, return to standing",
     cameraPosition: "Place phone on the side at hip height",
     muscleGroup: "legs",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 100, 
+        maxAngle: 180,
+        message: "Menține trunchiul mai drept!",
+        affectedLandmarks: ["leftShoulder", "leftHip"],
+      },
+    ],
   },
 
   calfRaises: {
     name: "Calf Raises",
     landmarks: ["leftKnee", "leftAnkle", "leftFootIndex"],
-    minAngle: 80,
-    maxAngle: 135,
+    minAngle: 90,
+    maxAngle: 125,
     side: "both",
     countOn: "up",
     type: "reps",
-    description:
-      "Stand straight, raise heels as high as possible, lower slowly",
+    description: "Stand straight, raise heels as high as possible, lower slowly",
     cameraPosition: "Place phone on the side at ankle height",
     muscleGroup: "legs",
     formRules: [
       {
         landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-        minAngle: 145,
-        message: "Keep your legs straight! Don't bend your knees.",
+        minAngle: 130, 
+        maxAngle: 180,
+        message: "Încearcă să nu îndoi prea mult genunchii.",
         affectedLandmarks: ["leftKnee"],
       },
     ],
@@ -179,22 +203,29 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
   pullups: {
     name: "Pull-ups",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 50, // Bărbia peste bară (unghi mic)
-    maxAngle: 170,
+    minAngle: 65,
+    maxAngle: 150,
     side: "both",
     countOn: "down",
     type: "reps",
-    description:
-      "Hang from bar, pull body up until chin clears bar, lower slowly",
+    description: "Hang from bar, pull body up until chin clears bar, lower slowly",
     cameraPosition: "⚠️ Place phone BEHIND you at shoulder height",
     muscleGroup: "back",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 120, 
+        maxAngle: 180,
+        message: "Evită balansul prea mare!",
+        affectedLandmarks: ["leftHip", "leftKnee"],
+      },
+    ],
   },
 
   plank: {
     name: "Plank",
-    landmarks: ["leftShoulder", "leftElbow", "leftWrist"], // Plansa pe brațe întinse
-    minAngle: 140,
+    landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
+    minAngle: 110,
     maxAngle: 180,
     side: "both",
     countOn: "up",
@@ -205,8 +236,9 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
     formRules: [
       {
         landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-        minAngle: 150, // Corp drept
-        message: "Keep your body straight! Don't let hips sag.",
+        minAngle: 110, // Toleranță uriașă
+        maxAngle: 180,
+        message: "Atenție la bazin, menține spatele drept!",
         affectedLandmarks: ["leftHip"],
       },
     ],
@@ -214,189 +246,272 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
 
   gluteBridge: {
     name: "Glute Bridge",
-    landmarks: ["leftShoulder", "leftHip", "leftKnee"], // Extensia bazinului
-    minAngle: 100,
-    maxAngle: 170,
+    landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+    minAngle: 110,
+    maxAngle: 160,
     side: "both",
     countOn: "up",
     type: "reps",
     description: "Lie on back, knees bent, lift hips to form straight line",
     cameraPosition: "Place phone on the side at hip height",
     muscleGroup: "legs",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 70,
+        maxAngle: 180, 
+        message: "Împinge bazinul mai sus!",
+        affectedLandmarks: ["leftHip"],
+      },
+    ],
   },
 
   mountainClimbers: {
     name: "Mountain Climbers",
-    landmarks: ["leftShoulder", "leftHip", "leftKnee"], // Flexia șoldului
+    landmarks: ["leftShoulder", "leftHip", "leftKnee"],
     minAngle: 80,
-    maxAngle: 170,
+    maxAngle: 150,
     side: "both",
     countOn: "up",
     type: "reps",
     description: "Start in plank, drive knees toward chest alternately",
     cameraPosition: "Place phone on the side at hip height",
     muscleGroup: "core",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 100, 
+        maxAngle: 180,
+        message: "Menține bazinul la același nivel!",
+        affectedLandmarks: ["leftHip"],
+      },
+    ],
   },
 
   jumpingJacks: {
     name: "Jumping Jacks",
-    landmarks: ["leftHip", "leftShoulder", "leftWrist"], // Mișcarea se urmărește mult mai bine din umăr-braț!
-    minAngle: 10,
-    maxAngle: 160,
+    landmarks: ["leftHip", "leftShoulder", "leftWrist"],
+    minAngle: 30,
+    maxAngle: 140,
     side: "both",
     countOn: "up",
     type: "reps",
     description: "Jump feet apart while raising arms overhead, jump back",
     cameraPosition: "Place phone in front at shoulder height",
     muscleGroup: "cardio",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["nose", "leftShoulder", "leftHip"],
+        minAngle: 120,
+        maxAngle: 180,
+        message: "Ține spatele drept!",
+        affectedLandmarks: ["leftShoulder"],
+      }
+    ],
   },
 
   highKnees: {
     name: "High Knees",
-    landmarks: ["leftShoulder", "leftHip", "leftKnee"], // Flexia se face din șold, nu din genunchi!
-    minAngle: 70,
-    maxAngle: 170,
+    landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+    minAngle: 85,
+    maxAngle: 155,
     side: "both",
     countOn: "up",
     type: "reps",
     description: "Run in place, bring knees up to hip height",
     cameraPosition: "Place phone on the side at hip height",
     muscleGroup: "cardio",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftAnkle"],
+        minAngle: 110, 
+        maxAngle: 180,
+        message: "Nu te apleca prea mult spre genunchi.",
+        affectedLandmarks: ["leftHip"],
+      }
+    ],
   },
 
   wallSit: {
     name: "Wall Sit",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 70,
-    maxAngle: 115,
+    minAngle: 75,
+    maxAngle: 120,
     side: "both",
     countOn: "up",
     type: "timed",
-    description:
-      "Back against wall, slide down until thighs parallel to ground",
+    description: "Back against wall, slide down until thighs parallel to ground",
     cameraPosition: "Place phone on the side at hip height",
     muscleGroup: "legs",
     formRules: [
       {
         landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-        minAngle: 75,
-        maxAngle: 110,
-        message: "Keep your back flat against the wall!",
+        minAngle: 45,
+        maxAngle: 130, 
+        message: "Ține spatele lipit de perete!",
         affectedLandmarks: ["leftShoulder", "leftHip"],
       },
     ],
   },
-  // ── Added presets fallbacks ──
+
   diamondPushups: {
     name: "Diamond Push-ups",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 70,
-    maxAngle: 170,
+    minAngle: 85,
+    maxAngle: 145,
     side: "both",
     countOn: "up",
     type: "reps",
     description: "Hands close under chest, elbows narrow, press up.",
     cameraPosition: "Place phone on the side at shoulder height",
     muscleGroup: "chest",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 100,
+        maxAngle: 180,
+        message: "Încearcă să menții corpul drept!",
+        affectedLandmarks: ["leftHip"],
+      },
+    ],
   },
 
   widePushups: {
     name: "Wide Push-ups",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 70,
-    maxAngle: 170,
+    minAngle: 85,
+    maxAngle: 145,
     side: "both",
     countOn: "up",
     type: "reps",
     description: "Hands wider than shoulders, lower chest and push up.",
     cameraPosition: "Place phone on the side at shoulder height",
     muscleGroup: "chest",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 100,
+        maxAngle: 180,
+        message: "Încearcă să menții corpul drept!",
+        affectedLandmarks: ["leftHip"],
+      },
+    ],
   },
 
   pikePushups: {
     name: "Pike Push-ups",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 60,
-    maxAngle: 160,
+    minAngle: 75,
+    maxAngle: 140,
     side: "both",
     countOn: "up",
     type: "reps",
-    description:
-      "Hips high in pike, bend elbows to bring head down then press.",
+    description: "Hips high in pike, bend elbows to bring head down then press.",
     cameraPosition: "Phone on the side at head height",
     muscleGroup: "shoulders",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 40,
+        maxAngle: 140, 
+        message: "Ridică bazinul mai mult!",
+        affectedLandmarks: ["leftHip"],
+      }
+    ],
   },
 
   dips: {
     name: "Dips (Chair)",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 60,
-    maxAngle: 160,
+    minAngle: 85,
+    maxAngle: 150,
     side: "both",
     countOn: "up",
     type: "reps",
-    description:
-      "Hands on chair/bench behind you, lower elbows to ~90°, push up.",
+    description: "Hands on chair/bench behind you, lower elbows to ~90°, push up.",
     cameraPosition: "Phone on the side at shoulder height",
     muscleGroup: "arms",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 100, 
+        maxAngle: 180,
+        message: "Păstrează corpul aproape de scaun!",
+        affectedLandmarks: ["leftShoulder"],
+      },
+    ],
   },
 
   stepUps: {
     name: "Step-ups",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 65,
-    maxAngle: 170,
+    minAngle: 85,
+    maxAngle: 155,
     side: "left",
     countOn: "up",
     type: "reps",
-    description:
-      "Step onto a box with one leg, drive through heel to stand tall.",
+    description: "Step onto a box with one leg, drive through heel to stand tall.",
     cameraPosition: "Phone on the side at knee height",
     muscleGroup: "legs",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 110,
+        maxAngle: 180,
+        message: "Trunchiul mai drept la ridicare!",
+        affectedLandmarks: ["leftHip"],
+      }
+    ],
   },
 
   deadBug: {
     name: "Dead Bug",
     landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-    minAngle: 60,
-    maxAngle: 170,
+    minAngle: 75,
+    maxAngle: 155,
     side: "both",
     countOn: "down",
     type: "reps",
-    description:
-      "On back, alternate extending opposite arm/leg while keeping core tight.",
+    description: "On back, alternate extending opposite arm/leg while keeping core tight.",
     cameraPosition: "Phone above at hip height angled down",
     muscleGroup: "core",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 110, 
+        maxAngle: 180,
+        message: "Lipește zona lombară de podea!",
+        affectedLandmarks: ["leftHip"],
+      },
+    ],
   },
 
   legRaises: {
     name: "Leg Raises",
     landmarks: ["leftHip", "leftKnee", "leftAnkle"],
-    minAngle: 55,
-    maxAngle: 160,
+    minAngle: 75,
+    maxAngle: 145,
     side: "both",
     countOn: "down",
     type: "reps",
     description: "Lie on back, raise legs to 90°, lower with control.",
     cameraPosition: "Phone on the side at hip height",
     muscleGroup: "core",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftHip", "leftKnee", "leftAnkle"],
+        minAngle: 130, 
+        maxAngle: 180,
+        message: "Încearcă să ții picioarele mai drepte!",
+        affectedLandmarks: ["leftKnee"],
+      },
+    ],
   },
 
   sidePlank: {
     name: "Side Plank",
     landmarks: ["leftShoulder", "leftHip", "leftAnkle"],
-    minAngle: 140,
+    minAngle: 120,
     maxAngle: 180,
     side: "left",
     countOn: "up",
@@ -404,42 +519,70 @@ export const EXERCISES: Record<string, ExerciseConfig> = {
     description: "Support on one forearm, body in straight line, hold.",
     cameraPosition: "Phone on the side at shoulder height",
     muscleGroup: "core",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftAnkle"],
+        minAngle: 110, 
+        maxAngle: 180,
+        message: "Nu lăsa bazinul să cadă!",
+        affectedLandmarks: ["leftHip"],
+      },
+    ],
   },
 
   wallPushup: {
     name: "Wall Push-up",
     landmarks: ["leftShoulder", "leftElbow", "leftWrist"],
-    minAngle: 70,
-    maxAngle: 170,
+    minAngle: 90,
+    maxAngle: 155,
     side: "both",
     countOn: "up",
     type: "reps",
     description: "Hands on wall, lean forward, bend elbows, push back.",
     cameraPosition: "Phone on the side at shoulder height",
     muscleGroup: "chest",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 110,
+        maxAngle: 180,
+        message: "Menține corpul drept!",
+        affectedLandmarks: ["leftHip"],
+      }
+    ],
   },
 
   burpees: {
     name: "Burpees",
     landmarks: ["leftShoulder", "leftHip", "leftKnee"],
-    minAngle: 55,
-    maxAngle: 175,
+    minAngle: 75,
+    maxAngle: 160,
     side: "both",
     countOn: "up",
     type: "reps",
     description: "Squat down, kick back to plank, return and jump.",
     cameraPosition: "Phone in front at waist height",
     muscleGroup: "fullbody",
-    formRules: [],
+    formRules: [
+      {
+        landmarks: ["leftShoulder", "leftHip", "leftKnee"],
+        minAngle: 110,
+        maxAngle: 180,
+        message: "Sari mai sus!",
+        affectedLandmarks: ["leftHip"]
+      }
+    ],
   },
 };
 
 export const calculateAngle = (p1: Point, p2: Point, p3: Point): number => {
   const radians =
-    Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x);
+    Math.atan2(p3.y - p2.y, p3.x - p2.x) -
+    Math.atan2(p1.y - p2.y, p1.x - p2.x);
+  
   let angle = Math.abs((radians * 180) / Math.PI);
+  
   if (angle > 180) angle = 360 - angle;
+  
   return angle;
 };
