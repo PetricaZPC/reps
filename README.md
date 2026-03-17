@@ -5,7 +5,6 @@
 ![Gemini](https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google%20gemini&logoColor=white)
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-00A98F?style=for-the-badge&logo=google&logoColor=white)
 
-> **Winner / Participant at ITFest 2026 (Sport Tech and Nutrition Track)** 🏆
 
 ## 📖 About The Project
 **REPS** solves the problem of fragmented health tracking. Instead of using one app for calorie counting and another for workouts, REPS unifies them using Artificial Intelligence. It features an AI-powered motion tracker to validate workout forms and an intelligent AI Assistant that logs food, calculates macros, and generates personalized recipes based on user goals, age, and medical conditions.
