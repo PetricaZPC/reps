@@ -18,9 +18,12 @@
 
 ## 📱 Screenshots & Demo
 
-| Dashboard & Tracking | AI Nutritionist | Form Validation (Squats) | Form Correction (Planks) |
-|:---:|:---:|:---:|:---:|
-| <img src="./screenshots/squat.jpeg" width="200"> | <img src="./screenshots/plank.jpeg" width="200"> | <img src="./screenshots/nutrition.jpeg" width="200"> | <img src="./screenshots/recipe.jpeg" width="200"> | <img src="./screenshots/profile1.jpeg" width="200">| <img src="./screenshots/profile2.jpeg" width="200">| <img src="./screenshots/profile3.jpeg" width="200">
+| Form Validation (Squats) | Form Correction (Planks) |
+| <img src="./screenshots/squat.jpeg" width="200"> | <img src="./screenshots/plank.jpeg" width="200"> |
+| AI Nutritionist |
+| <img src="./screenshots/nutrition.jpeg" width="200"> | <img src="./screenshots/recipe.jpeg" width="200"> |
+| Dashboard & Tracking |
+<img src="./screenshots/profile1.jpeg" width="200">| <img src="./screenshots/profile2.jpeg" width="200">| <img src="./screenshots/profile3.jpeg" width="200">
 
 ## 🛠️ Tech Stack
 * **Frontend:** React Native
