@@ -20,7 +20,7 @@
 
 | Dashboard & Tracking | AI Nutritionist | Form Validation (Squats) | Form Correction (Planks) |
 |:---:|:---:|:---:|:---:|
-| <img src="./screenshots/dashboard.jpg" width="200"> | <img src="./screenshots/chat.jpg" width="200"> | <img src="./screenshots/squats.jpg" width="200"> | <img src="./screenshots/plank.jpg" width="200"> |
+| <img src="./screenshots/squat.jpeg" width="200"> | <img src="./screenshots/plank.jpeg" width="200"> | <img src="./screenshots/nutrition.jpeg" width="200"> | <img src="./screenshots/recipe.jpeg" width="200"> | <img src="./screenshots/profile1.jpeg" width="200">| <img src="./screenshots/profile2.jpeg" width="200">| <img src="./screenshots/profile3.jpeg" width="200">
 
 ## 🛠️ Tech Stack
 * **Frontend:** React Native
@@ -50,19 +50,26 @@ To get a local copy up and running, follow these simple steps:
    `npm install`
 
 4. **Set up Environment Variables:**
-   Create a `.env` file in the root directory of the project and add your API keys:
-   ```env```
-   # Gemini API Key
-EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
+   Create a `.env` file in the root directory of the project and add your API keys. Make sure this file matches the following structure:
+   ```env
+   EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
 
-# Firebase Configuration
-EXPO_PUBLIC_API_KEY=your_firebase_api_key
-EXPO_PUBLIC_AUTH_DOMAIN=your_firebase_auth_domain
-EXPO_PUBLIC_PROJECT_ID=your_firebase_project_id
-EXPO_PUBLIC_STORAGE_BUCKET=your_firebase_storage_bucket
-EXPO_PUBLIC_MESSAGING_SENDER_ID=your_messaging_sender_id
-EXPO_PUBLIC_APP_ID=your_firebase_app_id
-EXPO_PUBLIC_MEASUREMENT_ID=your_measurement_id
+   API_KEY=your_firebase_api_key
+   AUTH_DOMAIN=your_firebase_auth_domain
+   PROJECT_ID=your_firebase_project_id
+   STORAGE_BUCKET=your_firebase_storage_bucket
+   MESSAGING_SENDER_ID=your_messaging_sender_id
+   APP_ID=your_firebase_app_id
+   MEASUREMENT_ID=your_measurement_id
+
+   EXPO_PUBLIC_API_KEY=your_expo_firebase_api_key
+   EXPO_PUBLIC_AUTH_DOMAIN=your_expo_firebase_auth_domain
+   EXPO_PUBLIC_PROJECT_ID=your_expo_firebase_project_id
+   EXPO_PUBLIC_STORAGE_BUCKET=your_expo_firebase_storage_bucket
+   EXPO_PUBLIC_MESSAGING_SENDER_ID=your_expo_messaging_sender_id
+   EXPO_PUBLIC_APP_ID=your_expo_firebase_app_id
+   EXPO_PUBLIC_MEASUREMENT_ID=your_expo_measurement_id
+   ```
 
 5. **Start the Expo server:**
 `npx expo start`
