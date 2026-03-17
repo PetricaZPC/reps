@@ -1,50 +1,85 @@
-# Welcome to your Expo app 👋
+# REPS - AI-Powered Fitness & Nutrition Tracker 🏋️‍♂️🥗
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+![React Native](https://img.shields.io/badge/react_native-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
+![Firebase](https://img.shields.io/badge/firebase-%23039BE5.svg?style=for-the-badge&logo=firebase)
+![Gemini](https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google%20gemini&logoColor=white)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-00A98F?style=for-the-badge&logo=google&logoColor=white)
 
-## Get started
 
-1. Install dependencies
+## 📖 About The Project
+**REPS** solves the problem of fragmented health tracking. Instead of using one app for calorie counting and another for workouts, REPS unifies them using Artificial Intelligence. It features an AI-powered motion tracker to validate workout forms and an intelligent AI Assistant that logs food, calculates macros, and generates personalized recipes based on user goals, age, and medical conditions.
 
-   ```bash
-   npm install
+## ✨ Key Features
+* **🤖 AI Motion Tracking:** Uses device camera to track body joints in real-time. It automatically counts reps and provides instant feedback on posture (e.g., warning the user to keep their back straight during planks).
+* **🍏 Smart Nutrition Assistant (Powered by Gemini):** Log your meals using natural language (e.g., "I ate 200g of chicken and 120g of rice"). The AI automatically extracts calories, proteins, carbs, and fats, adding them to your daily target.
+* **👨‍🍳 Personalized Recipe Generator:** Ask the AI for a meal plan to fill your remaining daily macros, taking into account specific medical conditions (e.g., hypertension).
+* **📊 Analytics Dashboard:** Track your daily streaks, weight evolution (with graphs), BMI, and macro targets.
+* **🔐 User Authentication:** Secure login and user data storage.
+
+## 📱 Screenshots & Demo
+
+| Form Validation (Squats) | Form Correction (Planks) |
+| <img src="./screenshots/squat.jpeg" width="200"> | <img src="./screenshots/plank.jpeg" width="200"> |
+| AI Nutritionist |
+| <img src="./screenshots/nutrition.jpeg" width="200"> | <img src="./screenshots/recipe.jpeg" width="200"> |
+| Dashboard & Tracking |
+<img src="./screenshots/profile1.jpeg" width="200">| <img src="./screenshots/profile2.jpeg" width="200">| <img src="./screenshots/profile3.jpeg" width="200">
+
+## 🛠️ Tech Stack
+* **Frontend:** React Native
+* **Motion Tracking / Computer Vision:** MediaPipe Pose
+* **AI & NLP:** Google Gemini API
+* **Backend & Database:** Firebase (Authentication, Firestore)
+
+## 🚀 How to Run Locally
+
+To get a local copy up and running, follow these simple steps:
+
+### Prerequisites
+* **Node.js** installed on your machine.
+* **Android Studio & Android SDK** configured on your machine.
+* A physical Android device or an Android Emulator. 
+*(Note: The standard Expo Go app is not supported due to the use of custom native libraries).*
+
+### Installation
+
+1. **Clone the repository:**
+   `git clone https://github.com/PetricaZPC/reps.git`
+
+2. **Navigate to the project directory:**
+   `cd reps`
+
+3. **Install dependencies:**
+   `npm install`
+
+4. **Set up Environment Variables:**
+   Create a `.env` file in the root directory of the project and add your API keys. Make sure this file matches the following structure:
+   ```env
+   EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
+
+   API_KEY=your_firebase_api_key
+   AUTH_DOMAIN=your_firebase_auth_domain
+   PROJECT_ID=your_firebase_project_id
+   STORAGE_BUCKET=your_firebase_storage_bucket
+   MESSAGING_SENDER_ID=your_messaging_sender_id
+   APP_ID=your_firebase_app_id
+   MEASUREMENT_ID=your_measurement_id
+
+   EXPO_PUBLIC_API_KEY=your_expo_firebase_api_key
+   EXPO_PUBLIC_AUTH_DOMAIN=your_expo_firebase_auth_domain
+   EXPO_PUBLIC_PROJECT_ID=your_expo_firebase_project_id
+   EXPO_PUBLIC_STORAGE_BUCKET=your_expo_firebase_storage_bucket
+   EXPO_PUBLIC_MESSAGING_SENDER_ID=your_expo_messaging_sender_id
+   EXPO_PUBLIC_APP_ID=your_expo_firebase_app_id
+   EXPO_PUBLIC_MEASUREMENT_ID=your_expo_measurement_id
    ```
 
-2. Start the app
+5. **Start the Expo server:**
+`npx expo start`
 
-   ```bash
-   npx expo start
-   ```
+6. **Run the application:**
+Because this app uses native modules (such as MediaPipe for AI motion tracking) that are not supported by Expo Go, it must be compiled as a development build. Additionally, this project is currently configured for Android only.
 
-In the output, you'll find options to open the app in a
+Open a new terminal window in the project folder and run:
+`npx expo run:android`
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
