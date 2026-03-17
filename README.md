@@ -1,50 +1,76 @@
-# Welcome to your Expo app 👋
+# REPS - AI-Powered Fitness & Nutrition Tracker 🏋️‍♂️🥗
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+![React Native](https://img.shields.io/badge/react_native-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
+![Firebase](https://img.shields.io/badge/firebase-%23039BE5.svg?style=for-the-badge&logo=firebase)
+![Gemini](https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google%20gemini&logoColor=white)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-00A98F?style=for-the-badge&logo=google&logoColor=white)
 
-## Get started
+> **Winner / Participant at ITFest 2026 (Sport Tech and Nutrition Track)** 🏆
 
-1. Install dependencies
+## 📖 About The Project
+**REPS** solves the problem of fragmented health tracking. Instead of using one app for calorie counting and another for workouts, REPS unifies them using Artificial Intelligence. It features an AI-powered motion tracker to validate workout forms and an intelligent AI Assistant that logs food, calculates macros, and generates personalized recipes based on user goals, age, and medical conditions.
 
-   ```bash
-   npm install
-   ```
+## ✨ Key Features
+* **🤖 AI Motion Tracking:** Uses device camera to track body joints in real-time. It automatically counts reps and provides instant feedback on posture (e.g., warning the user to keep their back straight during planks).
+* **🍏 Smart Nutrition Assistant (Powered by Gemini):** Log your meals using natural language (e.g., "I ate 200g of chicken and 120g of rice"). The AI automatically extracts calories, proteins, carbs, and fats, adding them to your daily target.
+* **👨‍🍳 Personalized Recipe Generator:** Ask the AI for a meal plan to fill your remaining daily macros, taking into account specific medical conditions (e.g., hypertension).
+* **📊 Analytics Dashboard:** Track your daily streaks, weight evolution (with graphs), BMI, and macro targets.
+* **🔐 User Authentication:** Secure login and user data storage.
 
-2. Start the app
+## 📱 Screenshots & Demo
 
-   ```bash
-   npx expo start
-   ```
+| Dashboard & Tracking | AI Nutritionist | Form Validation (Squats) | Form Correction (Planks) |
+|:---:|:---:|:---:|:---:|
+| <img src="./screenshots/dashboard.jpg" width="200"> | <img src="./screenshots/chat.jpg" width="200"> | <img src="./screenshots/squats.jpg" width="200"> | <img src="./screenshots/plank.jpg" width="200"> |
 
-In the output, you'll find options to open the app in a
+## 🛠️ Tech Stack
+* **Frontend:** React Native
+* **Motion Tracking / Computer Vision:** MediaPipe Pose
+* **AI & NLP:** Google Gemini API
+* **Backend & Database:** Firebase (Authentication, Firestore)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 🚀 How to Run Locally
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+To get a local copy up and running, follow these simple steps:
 
-## Get a fresh project
+### Prerequisites
+* **Node.js** installed on your machine.
+* **Android Studio & Android SDK** configured on your machine.
+* A physical Android device or an Android Emulator. 
+*(Note: The standard Expo Go app is not supported due to the use of custom native libraries).*
 
-When you're ready, run:
+### Installation
 
-```bash
-npm run reset-project
-```
+1. **Clone the repository:**
+   `git clone https://github.com/PetricaZPC/reps.git`
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. **Navigate to the project directory:**
+   `cd reps`
 
-## Learn more
+3. **Install dependencies:**
+   `npm install`
 
-To learn more about developing your project with Expo, look at the following resources:
+4. **Set up Environment Variables:**
+   Create a `.env` file in the root directory of the project and add your API keys:
+   ```env```
+   # Gemini API Key
+EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# Firebase Configuration
+EXPO_PUBLIC_API_KEY=your_firebase_api_key
+EXPO_PUBLIC_AUTH_DOMAIN=your_firebase_auth_domain
+EXPO_PUBLIC_PROJECT_ID=your_firebase_project_id
+EXPO_PUBLIC_STORAGE_BUCKET=your_firebase_storage_bucket
+EXPO_PUBLIC_MESSAGING_SENDER_ID=your_messaging_sender_id
+EXPO_PUBLIC_APP_ID=your_firebase_app_id
+EXPO_PUBLIC_MEASUREMENT_ID=your_measurement_id
 
-## Join the community
+5. **Start the Expo server:**
+`npx expo start`
 
-Join our community of developers creating universal apps.
+6. **Run the application:**
+Because this app uses native modules (such as MediaPipe for AI motion tracking) that are not supported by Expo Go, it must be compiled as a development build. Additionally, this project is currently configured for Android only.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Open a new terminal window in the project folder and run:
+`npx expo run:android`
+
