@@ -18,12 +18,57 @@
 
 ## 📱 Screenshots & Demo
 
-| Form Validation (Squats) | Form Correction (Planks) |
-| <img src="./screenshots/squat.jpeg" width="200"> | <img src="./screenshots/plank.jpeg" width="200"> |
-| AI Nutritionist |
-| <img src="./screenshots/nutrition.jpeg" width="200"> | <img src="./screenshots/recipe.jpeg" width="200"> |
-| Dashboard & Tracking |
-<img src="./screenshots/profile1.jpeg" width="200">| <img src="./screenshots/profile2.jpeg" width="200">| <img src="./screenshots/profile3.jpeg" width="200">
+<p align="center">
+  A visual tour of the REPS application, from AI form tracking to the smart nutrition assistant.
+</p>
+
+<table border="0">
+  <tr>
+    <td align="center" valign="top" colspan="2">
+      <h3>🤖 AI-Powered Exercise Form Tracking</h3>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="./screenshots/squat.jpeg" width="220" alt="Form Validation - Squats">
+      <br><em>Form Validation (Squats)</em>
+    </td>
+    <td align="center">
+      <img src="./screenshots/plank.jpeg" width="220" alt="Form Correction - Planks">
+      <br><em>Form Correction (Planks)</em>
+    </td>
+  </tr>
+
+  <tr>
+    <td align="center" valign="top" colspan="2">
+      <br><h3>🍏 Smart Nutrition & Recipe Assistant</h3>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="./screenshots/nutrition.jpeg" width="220" alt="AI Nutritionist">
+      <br><em>Food Logging & Macros</em>
+    </td>
+    <td align="center">
+      <img src="./screenshots/recipe.jpeg" width="220" alt="Recipe Generation">
+      <br><em>AI Recipe Generator</em>
+    </td>
+  </tr>
+
+  <tr>
+    <td align="center" valign="top" colspan="2">
+      <br><h3>📊 User Dashboard & Progress Tracking</h3>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <img src="./screenshots/profile1.jpeg" width="200" alt="Profile Dashboard 1">&nbsp;&nbsp;&nbsp;&nbsp;
+      <img src="./screenshots/profile2.jpeg" width="200" alt="Profile Dashboard 2">&nbsp;&nbsp;&nbsp;&nbsp;
+      <img src="./screenshots/profile3.jpeg" width="200" alt="Profile Dashboard 3">
+      <br><em>Overview, Weight Tracking, BMI</em>
+    </td>
+  </tr>
+</table>
 
 ## 🛠️ Tech Stack
 * **Frontend:** React Native
