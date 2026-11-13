@@ -1,14 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-} from "firebase/firestore";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -23,7 +14,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { auth, db } from "../firebase/firebaseConfig";
+import { getCurrentUser, getUserDoc, listWorkoutLogs } from "../src/store";
 import { saveTodayNutrition } from "../src/nutritionPersistence";
 import { passData } from "../src/passData";
 import {
@@ -451,7 +442,7 @@ export default function Assistant() {
   // istoricul antrenamentelor — pentru recomandări inteligente
   const [recentWorkouts, setRecentWorkouts] = useState<WorkoutLogEntry[]>([]);
 
-  const userId = auth.currentUser?.uid;
+  const userId = getCurrentUser()?.uid;
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -531,13 +522,12 @@ export default function Assistant() {
   }, [messages, chatLoaded, userId]);
 
   const loadTargets = useCallback(async () => {
-    const user = auth.currentUser;
+    const user = getCurrentUser();
     if (!user) return;
     try {
       // Date utilizator + plan
-      const snap = await getDoc(doc(db, "users", user.uid));
-      if (snap.exists()) {
-        const d = snap.data() as any;
+      const d = (await getUserDoc(user.uid)) as any;
+      if (d) {
         const cal = Number(d?.plan?.dailyCalories);
         const prot = Number(d?.plan?.dailyProtein);
         const carb = Number(d?.plan?.dailyCarbs);
@@ -552,15 +542,9 @@ export default function Assistant() {
 
       // Istoricul antrenamentelor (ultimele 10)
       try {
-        const q = query(
-          collection(db, `users/${user.uid}/workoutLogs`),
-          orderBy("completedAt", "desc"),
-          limit(10),
-        );
-        const logsSnap = await getDocs(q);
+        const logsRaw = await listWorkoutLogs(user.uid, 10);
         const logs: WorkoutLogEntry[] = [];
-        logsSnap.forEach((d) => {
-          const data = d.data() as any;
+        logsRaw.forEach((data: any) => {
           logs.push({
             presetId: data.presetId,
             presetName: data.presetName ?? "Antrenament",

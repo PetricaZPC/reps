@@ -157,7 +157,7 @@ export default function SignIn() {
     }
     Alert.alert(
       "Cont demo",
-      "Folosești un cont demo cu date de exemplu. Funcțiile AI folosesc o cheie Gemini gratuită care probabil a expirat; restul aplicației funcționează normal.",
+      "Demo fără cont și fără bază de date: datele de exemplu rămân doar pe telefon. Funcțiile AI folosesc o cheie Gemini gratuită care probabil a expirat; restul aplicației funcționează normal.",
     );
   };
 
@@ -236,7 +236,7 @@ export default function SignIn() {
           activeOpacity={0.88}
         >
           <Text style={s.demoBtnText}>
-            {demoLoading ? "Se pornește..." : "Încearcă demo (fără cont)"}
+            {demoLoading ? "Se pornește..." : "Try application"}
           </Text>
         </TouchableOpacity>
 

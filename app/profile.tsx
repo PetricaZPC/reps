@@ -1,15 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  updateDoc,
-} from "firebase/firestore";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -25,8 +15,8 @@ import {
   View,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
-import { auth, db } from "../firebase/firebaseConfig";
 import { passData } from "../src/passData";
+import { getCurrentUser, getUserDoc, listWorkoutLogs, updateUserDoc } from "../src/store";
 
 // Tokens
 const C = {
@@ -178,12 +168,12 @@ export default function Profile() {
   );
 
   const loadUserData = async (attempt = 0) => {
-    const user = auth.currentUser;
+    const user = getCurrentUser();
     if (!user) return;
     try {
-      const snap = await getDoc(doc(db, "users", user.uid));
-      if (snap.exists()) {
-        const data = snap.data() as UserData;
+      const raw = await getUserDoc(user.uid);
+      if (raw) {
+        const data = raw as UserData;
         setUserData(data);
         const todayEntry = (data.progress ?? []).find((p) => p.date === TODAY);
         if (todayEntry) setTodayWeight(String(todayEntry.weight));
@@ -197,18 +187,11 @@ export default function Profile() {
   };
 
   const loadWorkoutLogs = async () => {
-    const user = auth.currentUser;
+    const user = getCurrentUser();
     if (!user) return;
     try {
       setLoadingLogs(true);
-      const q = query(
-        collection(db, `users/${user.uid}/workoutLogs`),
-        orderBy("completedAt", "desc"),
-        limit(10),
-      );
-      const snap = await getDocs(q);
-      const logs: WorkoutLog[] = [];
-      snap.forEach((doc) => logs.push({ id: doc.id, ...(doc.data() as any) }));
+      const logs = (await listWorkoutLogs(user.uid, 10)) as WorkoutLog[];
       setWorkoutLogs(logs);
     } catch (e) {
       console.log("loadWorkoutLogs", e);
@@ -225,7 +208,7 @@ export default function Profile() {
       return;
     }
     const roundedWeight = Math.round(w * 10) / 10;
-    const user = auth.currentUser;
+    const user = getCurrentUser();
     if (!user || !userData) return;
 
     const progress = [...(userData.progress ?? [])];
@@ -262,7 +245,7 @@ export default function Profile() {
 
     try {
       setSavingWeight(true);
-      await updateDoc(doc(db, "users", user.uid), {
+      await updateUserDoc(user.uid, {
         progress,
         streak,
         lastLogDate: nextLastLogDate,
@@ -357,14 +340,14 @@ export default function Profile() {
         <View style={s.header}>
           <View style={s.avatarWrap}>
             <Text style={s.avatarInitial}>
-              {auth.currentUser?.email?.[0]?.toUpperCase() ??
-                (auth.currentUser?.isAnonymous ? "D" : "U")}
+              {getCurrentUser()?.email?.[0]?.toUpperCase() ??
+                (getCurrentUser()?.isDemo ? "D" : "U")}
             </Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.headerName}>
-              {auth.currentUser?.email?.split("@")[0] ??
-                (auth.currentUser?.isAnonymous ? "Cont demo" : "Utilizator")}
+              {getCurrentUser()?.email?.split("@")[0] ??
+                (getCurrentUser()?.isDemo ? "Cont demo" : "Utilizator")}
             </Text>
             <Text style={s.headerSub}>Progresul tau de azi</Text>
           </View>

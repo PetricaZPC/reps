@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { addDoc, collection, deleteDoc, doc, getDocs, query } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -16,7 +15,13 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { auth, db } from "../firebase/firebaseConfig";
+import {
+  addCustomWorkout,
+  addWorkoutLog,
+  deleteCustomWorkout,
+  getCurrentUser,
+  listCustomWorkouts,
+} from "../src/store";
 import Camera from "../src/Camera";
 import { EXERCISES, ExerciseConfig, MuscleGroup } from "../src/exercises";
 import {
@@ -304,7 +309,8 @@ export default function Workout() {
     preset: WorkoutPreset | null,
     results: WorkoutResult[],
   ) => {
-    if (!auth.currentUser || !preset || results.length === 0) return;
+    const currentUser = getCurrentUser();
+    if (!currentUser || !preset || results.length === 0) return;
     try {
       const totalSets = results.reduce((acc, r) => acc + r.sets.length, 0);
       const completedSets = results.reduce(
@@ -313,7 +319,7 @@ export default function Workout() {
       const totalVolume = results.reduce(
         (acc, r) => acc + r.sets.reduce((s, set) => s + set.repsOrSeconds, 0), 0,
       );
-      await addDoc(collection(db, `users/${auth.currentUser.uid}/workoutLogs`), {
+      await addWorkoutLog(currentUser.uid, {
         presetId: preset.id,
         presetName: preset.name,
         difficulty: preset.difficulty,
@@ -333,7 +339,8 @@ export default function Workout() {
     customWorkout: CustomWorkout | null,
     results: WorkoutResult[],
   ) => {
-    if (!auth.currentUser || !customWorkout || results.length === 0) return;
+    const currentUser = getCurrentUser();
+    if (!currentUser || !customWorkout || results.length === 0) return;
     try {
       const totalSets = results.reduce((acc, r) => acc + r.sets.length, 0);
       const completedSets = results.reduce(
@@ -342,7 +349,7 @@ export default function Workout() {
       const totalVolume = results.reduce(
         (acc, r) => acc + r.sets.reduce((s, set) => s + set.repsOrSeconds, 0), 0,
       );
-      await addDoc(collection(db, `users/${auth.currentUser.uid}/workoutLogs`), {
+      await addWorkoutLog(currentUser.uid, {
         presetId: customWorkout.id ?? "custom",
         presetName: customWorkout.name,
         difficulty: "intermediate",
@@ -358,22 +365,21 @@ export default function Workout() {
   };
 
   const loadCustomWorkouts = async () => {
-    if (!auth.currentUser) return;
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
     try {
-      const q = query(collection(db, `users/${auth.currentUser.uid}/customWorkouts`));
-      const snapshot = await getDocs(q);
-      const workouts: CustomWorkout[] = [];
-      snapshot.forEach((doc) => workouts.push({ id: doc.id, ...doc.data() } as CustomWorkout));
+      const workouts = (await listCustomWorkouts(currentUser.uid)) as CustomWorkout[];
       setSavedWorkouts(workouts);
     } catch {}
   };
 
   const saveCustomWorkout = async () => {
-    if (!auth.currentUser) { Alert.alert("Eroare", "Trebuie să fii autentificat."); return; }
+    const currentUser = getCurrentUser();
+    if (!currentUser) { Alert.alert("Eroare", "Trebuie să fii autentificat."); return; }
     if (!customWorkoutName.trim()) { Alert.alert("Eroare", "Introduceți un nume pentru antrenament."); return; }
     if (selectedExercises.length === 0) { Alert.alert("Eroare", "Selectați cel puțin un exercițiu."); return; }
     try {
-      await addDoc(collection(db, `users/${auth.currentUser.uid}/customWorkouts`), {
+      await addCustomWorkout(currentUser.uid, {
         name: customWorkoutName,
         exercises: selectedExercises,
         customTargets,
@@ -402,9 +408,10 @@ export default function Workout() {
         style: "destructive",
         onPress: async () => {
           // Șterge și din Firestore
-          if (auth.currentUser) {
+          const currentUser = getCurrentUser();
+          if (currentUser) {
             try {
-              await deleteDoc(doc(db, `users/${auth.currentUser.uid}/customWorkouts`, id));
+              await deleteCustomWorkout(currentUser.uid, id);
             } catch (e) {
               console.log("Failed to delete workout", e);
             }

@@ -8,12 +8,27 @@ import { auth } from "../firebase/firebaseConfig";
 import SignIn from "../firebase/signIn";
 import { loadTodayNutrition } from "../src/nutritionPersistence";
 import { passData } from "../src/passData";
+import { DEMO_UID, restoreSession, useSession } from "../src/store";
 import "./globals.css";
 
 export default function TabLayout() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const setTotals = passData((state) => state.setTotals);
+  const demo = useSession((state) => state.demo);
+  const sessionReady = useSession((state) => state.ready);
+
+  useEffect(() => {
+    restoreSession();
+  }, []);
+
+  // In demo mode the nutrition totals come from the device, not from Firestore.
+  useEffect(() => {
+    if (!demo) return;
+    loadTodayNutrition(DEMO_UID)
+      .then((totals) => setTotals(totals ?? { calories: 0, protein: 0, carbs: 0 }))
+      .catch(() => setTotals({ calories: 0, protein: 0, carbs: 0 }));
+  }, [demo, setTotals]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -21,7 +36,7 @@ export default function TabLayout() {
       setIsLoading(false);
 
       if (!currentUser) {
-        setTotals({ calories: 0, protein: 0, carbs: 0 });
+        if (!useSession.getState().demo) setTotals({ calories: 0, protein: 0, carbs: 0 });
         return;
       }
 
@@ -41,7 +56,7 @@ export default function TabLayout() {
     return unsubscribe;
   }, [setTotals]);
 
-  if (isLoading) {
+  if (isLoading || !sessionReady) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" />
@@ -49,7 +64,7 @@ export default function TabLayout() {
     );
   }
 
-  if (!user) {
+  if (!user && !demo) {
     return <SignIn />;
   }
 

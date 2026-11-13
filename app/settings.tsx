@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { sendPasswordResetEmail, updateEmail } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,7 +13,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { auth, db } from "../firebase/firebaseConfig";
+import { auth } from "../firebase/firebaseConfig";
+import { getCurrentUser, getUserDoc, mergeUserDoc, signOutAll } from "../src/store";
 import { Gemini } from "../src/useGemini";
 
 // ─── Design tokens ──────────────────────────────────────────
@@ -392,22 +392,21 @@ export default function Settings() {
 
   useEffect(() => {
     loadUserData();
-    setNewEmail(auth.currentUser?.email || "");
+    setNewEmail(getCurrentUser()?.email || "");
   }, []);
 
   const loadUserData = async () => {
     try {
-      const user = auth.currentUser;
+      const user = getCurrentUser();
       if (!user) {
         setUserData(EMPTY);
         return;
       }
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setUserData({ ...EMPTY, ...(docSnap.data() as UserData) });
+      const existing = await getUserDoc(user.uid);
+      if (existing) {
+        setUserData({ ...EMPTY, ...(existing as UserData) });
       } else {
-        await setDoc(docRef, EMPTY, { merge: true });
+        await mergeUserDoc(user.uid, EMPTY);
         setUserData(EMPTY);
       }
     } catch {
@@ -416,7 +415,7 @@ export default function Settings() {
   };
 
   const saveData = async () => {
-    const user = auth.currentUser;
+    const user = getCurrentUser();
     if (!user || !userData || isSaving) return;
     setIsSaving(true);
     setSaveStatus(null);
@@ -448,9 +447,7 @@ export default function Settings() {
         plan: Object.keys(nextPlan).length ? nextPlan : userData.plan,
       };
 
-      await setDoc(doc(db, "users", user.uid), payload as any, {
-        merge: true,
-      });
+      await mergeUserDoc(user.uid, payload as any);
       setUserData(payload);
       setEditing(false);
       setSaveStatus({
@@ -468,6 +465,10 @@ export default function Settings() {
   };
 
   const onChangeEmail = async () => {
+    if (getCurrentUser()?.isDemo) {
+      Alert.alert("Demo", "Schimbarea email-ului nu este disponibilă în contul demo.");
+      return;
+    }
     const user = auth.currentUser;
     if (!user || !newEmail.trim()) {
       Alert.alert("Eroare", "Introdu un email valid.");
@@ -558,7 +559,7 @@ export default function Settings() {
           </View>
           <View>
             <Text style={s.pageTitle}>Setări</Text>
-            <Text style={s.pageSubtitle}>{auth.currentUser?.email ?? (auth.currentUser?.isAnonymous ? "Cont demo (anonim)" : "")}</Text>
+            <Text style={s.pageSubtitle}>{getCurrentUser()?.email ?? (getCurrentUser()?.isDemo ? "Cont demo (fără cont real)" : "")}</Text>
           </View>
         </View>
 
@@ -909,7 +910,7 @@ export default function Settings() {
                 {
                   text: "Logout",
                   style: "destructive",
-                  onPress: () => auth.signOut(),
+                  onPress: () => signOutAll(),
                 },
               ])
             }

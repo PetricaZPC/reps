@@ -131,15 +131,16 @@ Open a new terminal window in the project folder and run:
 
 ## 🎮 Demo mode
 
-The sign-in screen has an **"Încearcă demo (fără cont)"** button. It signs in with a Firebase *anonymous* account and fills it with
-sample data (profile and nutrition plan, a week of weights, four workouts and today's meals) so every screen has content.
-Regular sign-in and sign-up are unchanged and use the same Firebase project and environment variables.
+The sign-in screen has a **Try application** button that opens the app immediately: no account, no sign-up and **no database**.
+Sample data (profile and nutrition plan, a week of weights, four workouts and today's meals) is kept on the device only
+(`AsyncStorage`, see `src/store.ts`), and everything you add in the demo stays on the device too. Logging out (Settings) leaves
+the demo and deletes that data. Regular sign-in and sign-up are unchanged and still use the same Firebase project and
+environment variables.
 
 Notes about the demo:
 
-- Anonymous sign-in must be enabled in the Firebase console (Authentication → Sign-in method → Anonymous). If it is not, or if the
-  free Firebase project has expired, the app shows a clear message instead of failing.
 - The AI assistant, recipe generator and plan calculation use a **free Google Gemini API key that has most likely expired or hit its quota**.
   The app then shows a clear message; the sign-up questionnaire falls back to a locally computed nutrition plan.
+- Changing the email or password is not available in the demo.
 - The AI motion tracking (MediaPipe) runs on the device and does not need any key, but it needs a physical Android device or emulator
   with a camera and a development build (Expo Go is not supported).

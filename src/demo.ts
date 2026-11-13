@@ -1,13 +1,9 @@
-import { signInAnonymously } from "firebase/auth";
-import { addDoc, collection, doc, setDoc } from "firebase/firestore";
-import { auth, db } from "../firebase/firebaseConfig";
-import { saveTodayNutrition } from "./nutritionPersistence";
 import { passData } from "./passData";
+import { DemoData, beginDemo } from "./store";
 
 /**
- * Demo mode: signs the visitor in with a Firebase *anonymous* account (no email or password needed)
- * and fills it with sample profile data, a week of weights, a few workouts and today's meals,
- * using the same Firestore documents the app already reads.
+ * Demo mode: opens the app with no account, no database and no network. Sample profile data, a week of
+ * weights, a few workouts and today's meals are kept on the device only (see src/store.ts).
  */
 
 const dayOffset = (days: number) => {
@@ -50,7 +46,7 @@ export function fallbackPlan(data: PersonalData) {
   return { dailyCalories, dailyProtein, dailyCarbs, dailyFat, dailyWater };
 }
 
-async function seedDemoData(uid: string) {
+function buildDemoData(): DemoData {
   const profile: PersonalData = {
     age: "24",
     weight: "74",
@@ -70,9 +66,15 @@ async function seedDemoData(uid: string) {
     metDiet: i >= 4,
   }));
 
-  await setDoc(
-    doc(db, "users", uid),
-    {
+  const logs = [
+    { presetId: "upper-day", presetName: "Upper Body Day", difficulty: "intermediate", totalSets: 12, completedSets: 11, totalVolume: 118, days: 1 },
+    { presetId: "core-day", presetName: "Core Day", difficulty: "intermediate", totalSets: 9, completedSets: 9, totalVolume: 96, days: 3 },
+    { presetId: "leg-day", presetName: "Leg Day", difficulty: "intermediate", totalSets: 12, completedSets: 10, totalVolume: 104, days: 5 },
+    { presetId: "beginner-full", presetName: "Beginner Full Body", difficulty: "beginner", totalSets: 9, completedSets: 9, totalVolume: 90, days: 6 },
+  ];
+
+  return {
+    user: {
       ...profile,
       hasHealthCondition: false,
       healthConditionName: "",
@@ -81,56 +83,28 @@ async function seedDemoData(uid: string) {
       streak: 3,
       lastLogDate: dateKey(1),
       isDemo: true,
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
     },
-    { merge: true },
-  );
-
-  const logs = [
-    { presetId: "upper-day", presetName: "Upper Body Day", difficulty: "intermediate", totalSets: 12, completedSets: 11, totalVolume: 118, days: 1 },
-    { presetId: "core-day", presetName: "Core Day", difficulty: "intermediate", totalSets: 9, completedSets: 9, totalVolume: 96, days: 3 },
-    { presetId: "leg-day", presetName: "Leg Day", difficulty: "intermediate", totalSets: 12, completedSets: 10, totalVolume: 104, days: 5 },
-    { presetId: "beginner-full", presetName: "Beginner Full Body", difficulty: "beginner", totalSets: 9, completedSets: 9, totalVolume: 90, days: 6 },
-  ];
-  for (const { days, ...log } of logs) {
-    await addDoc(collection(db, `users/${uid}/workoutLogs`), {
+    workoutLogs: logs.map(({ days, ...log }, i) => ({
+      id: `demo-log-${i}`,
       ...log,
       isCustom: false,
       completedAt: dayOffset(days).toISOString(),
-    });
-  }
-
-  const meals = { calories: 820, protein: 52, carbs: 96 };
-  await saveTodayNutrition(uid, meals);
-  // The auth listener already ran before the data existed, so refresh the in-memory totals.
-  passData.getState().setTotals(meals);
+    })),
+    customWorkouts: [],
+    nutrition: { [dateKey(0)]: { calories: 820, protein: 52, carbs: 96 } },
+  };
 }
 
-function friendlyAuthError(error: any): string {
-  const code = String(error?.code ?? "");
-  if (code.includes("admin-restricted-operation") || code.includes("operation-not-allowed")) {
-    return "Contul demo nu este disponibil: autentificarea anonimă nu este activată în proiectul Firebase (sau proiectul gratuit a expirat).";
-  }
-  if (code.includes("network")) return "Fără conexiune la internet.";
-  return `Nu am putut porni contul demo. ${error?.message ?? ""}`.trim();
-}
-
-/** Starts the demo session. Resolves to an error message, or null on success. */
+/** Opens the demo: no account, no network. Resolves to an error message, or null on success. */
 export async function startDemo(): Promise<string | null> {
-  let uid: string;
   try {
-    const cred = await signInAnonymously(auth);
-    uid = cred.user.uid;
+    const data = buildDemoData();
+    await beginDemo(data);
+    // The auth listener has nothing to load in demo mode, so set the in-memory totals directly.
+    passData.getState().setTotals(data.nutrition[dateKey(0)]);
+    return null;
   } catch (error: any) {
-    return friendlyAuthError(error);
+    return `Nu am putut porni demo-ul. ${error?.message ?? ""}`.trim();
   }
-
-  try {
-    await seedDemoData(uid);
-  } catch (error: any) {
-    // Signed in, but the sample data could not be written (e.g. Firestore rules or an expired project).
-    console.log("Demo seed failed", error);
-    return "Contul demo a fost creat, dar datele de exemplu nu au putut fi salvate (regulile Firestore sau proiectul gratuit Firebase pot fi expirate).";
-  }
-  return null;
 }
