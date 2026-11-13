@@ -177,16 +177,23 @@ export default function Profile() {
     }, []),
   );
 
-  const loadUserData = async () => {
+  const loadUserData = async (attempt = 0) => {
     const user = auth.currentUser;
     if (!user) return;
-    const snap = await getDoc(doc(db, "users", user.uid));
-    if (snap.exists()) {
-      const data = snap.data() as UserData;
-      setUserData(data);
-      const todayEntry = (data.progress ?? []).find((p) => p.date === TODAY);
-      if (todayEntry) setTodayWeight(String(todayEntry.weight));
+    try {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (snap.exists()) {
+        const data = snap.data() as UserData;
+        setUserData(data);
+        const todayEntry = (data.progress ?? []).find((p) => p.date === TODAY);
+        if (todayEntry) setTodayWeight(String(todayEntry.weight));
+        return;
+      }
+    } catch (e) {
+      console.log("loadUserData", e);
     }
+    // The profile document may still be being created (sign-up questionnaire or demo seeding): retry a few times.
+    if (attempt < 6) setTimeout(() => loadUserData(attempt + 1), 1500);
   };
 
   const loadWorkoutLogs = async () => {
@@ -350,12 +357,14 @@ export default function Profile() {
         <View style={s.header}>
           <View style={s.avatarWrap}>
             <Text style={s.avatarInitial}>
-              {auth.currentUser?.email?.[0]?.toUpperCase() ?? "U"}
+              {auth.currentUser?.email?.[0]?.toUpperCase() ??
+                (auth.currentUser?.isAnonymous ? "D" : "U")}
             </Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.headerName}>
-              {auth.currentUser?.email?.split("@")[0] ?? "Utilizator"}
+              {auth.currentUser?.email?.split("@")[0] ??
+                (auth.currentUser?.isAnonymous ? "Cont demo" : "Utilizator")}
             </Text>
             <Text style={s.headerSub}>Progresul tau de azi</Text>
           </View>

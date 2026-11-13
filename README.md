@@ -128,3 +128,18 @@ Because this app uses native modules (such as MediaPipe for AI motion tracking) 
 Open a new terminal window in the project folder and run:
 `npx expo run:android`
 
+
+## 🎮 Demo mode
+
+The sign-in screen has an **"Încearcă demo (fără cont)"** button. It signs in with a Firebase *anonymous* account and fills it with
+sample data (profile and nutrition plan, a week of weights, four workouts and today's meals) so every screen has content.
+Regular sign-in and sign-up are unchanged and use the same Firebase project and environment variables.
+
+Notes about the demo:
+
+- Anonymous sign-in must be enabled in the Firebase console (Authentication → Sign-in method → Anonymous). If it is not, or if the
+  free Firebase project has expired, the app shows a clear message instead of failing.
+- The AI assistant, recipe generator and plan calculation use a **free Google Gemini API key that has most likely expired or hit its quota**.
+  The app then shows a clear message; the sign-up questionnaire falls back to a locally computed nutrition plan.
+- The AI motion tracking (MediaPipe) runs on the device and does not need any key, but it needs a physical Android device or emulator
+  with a camera and a development build (Expo Go is not supported).

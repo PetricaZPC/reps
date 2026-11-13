@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { fallbackPlan, startDemo } from "../src/demo";
 import { Gemini } from "../src/useGemini";
 import { auth, db } from "./firebaseConfig";
 
@@ -86,6 +87,7 @@ export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLogin, setIsLogin] = useState(true);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [userData, setUserData] = useState({
     age: "",
@@ -103,13 +105,19 @@ export default function SignIn() {
   const submitQuestionnaire = async () => {
     try {
       const prompt = `Bazat pe datele utilizatorului: vârstă ${userData.age}, greutate ${userData.weight}kg, înălțime ${userData.height}cm, sex ${userData.sex}, greutate țintă ${userData.targetWeight}kg, nivel activitate ${userData.activityLevel}, obiectiv ${userData.goal}. Generează un plan zilnic de nutriție: calorii, proteine, carbohidrați, grăsimi, apă. Returnează JSON cu: dailyCalories, dailyProtein, dailyCarbs, dailyFat, dailyWater.`;
-      const response = await Gemini(prompt);
-      const plan = JSON.parse(
-        response
-          .replace(/```json/g, "")
-          .replace(/```/g, "")
-          .trim(),
-      );
+      let plan;
+      try {
+        const response = await Gemini(prompt);
+        plan = JSON.parse(
+          response
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim(),
+        );
+      } catch {
+        // The free Gemini key is probably expired: use a local plan so the profile can still be created
+        plan = fallbackPlan(userData);
+      }
       const user = auth.currentUser;
       if (user) {
         await setDoc(doc(db, "users", user.uid), {
@@ -136,6 +144,21 @@ export default function SignIn() {
     } catch (error: any) {
       Alert.alert("Eroare", error.message);
     }
+  };
+
+  const handleDemo = async () => {
+    if (demoLoading) return;
+    setDemoLoading(true);
+    const error = await startDemo();
+    setDemoLoading(false);
+    if (error) {
+      Alert.alert("Demo", error);
+      return;
+    }
+    Alert.alert(
+      "Cont demo",
+      "Folosești un cont demo cu date de exemplu. Funcțiile AI folosesc o cheie Gemini gratuită care probabil a expirat; restul aplicației funcționează normal.",
+    );
   };
 
   return (
@@ -204,6 +227,18 @@ export default function SignIn() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Demo */}
+        <TouchableOpacity
+          style={s.demoBtn}
+          onPress={handleDemo}
+          disabled={demoLoading}
+          activeOpacity={0.88}
+        >
+          <Text style={s.demoBtnText}>
+            {demoLoading ? "Se pornește..." : "Încearcă demo (fără cont)"}
+          </Text>
+        </TouchableOpacity>
 
         {/* Toggle */}
         <TouchableOpacity
@@ -423,6 +458,22 @@ const s = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     letterSpacing: 0.2,
+  },
+
+  // Demo
+  demoBtn: {
+    marginTop: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: C.accent,
+    backgroundColor: C.accentLight,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  demoBtnText: {
+    color: C.accent,
+    fontSize: 15,
+    fontWeight: "700",
   },
 
   // Toggle

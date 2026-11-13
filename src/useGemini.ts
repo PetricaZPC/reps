@@ -31,6 +31,14 @@ async function callGemini(prompt: string, timeoutMs = 20000): Promise<string> {
   }
 }
 
+// Free-tier keys expire or hit their quota: show a clear message instead of a raw API error.
+function friendlyAiError(message: string): string {
+  if (/api key|quota|expired|permission|billing|exhausted|not found|403|429/i.test(message)) {
+    return "Funcția AI nu este disponibilă: cheia Gemini gratuită a expirat probabil sau a depășit limita.";
+  }
+  return message;
+}
+
 // ─── Public API ───────────────────────────────────────────────
 export async function Gemini(userMessage: string): Promise<string> {
   try {
@@ -300,7 +308,7 @@ export async function askAssistant(
     if (err.name === "AbortError" || err.message?.includes("timeout")) {
       return { text: "Eroare: conexiune lentă. Încearcă din nou." };
     }
-    return { text: `Eroare: ${err.message ?? String(err)}` };
+    return { text: `Eroare: ${friendlyAiError(err.message ?? String(err))}` };
   }
 }
 
@@ -356,7 +364,7 @@ export async function askAssistantWithImage(
     if (err.name === "AbortError" || err.message?.includes("timeout")) {
       return { text: "Eroare: conexiune lentă. Încearcă din nou." };
     }
-    return { text: `Eroare: ${err.message ?? String(err)}` };
+    return { text: `Eroare: ${friendlyAiError(err.message ?? String(err))}` };
   }
 }
 

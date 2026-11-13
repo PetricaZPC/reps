@@ -558,7 +558,7 @@ export default function Settings() {
           </View>
           <View>
             <Text style={s.pageTitle}>Setări</Text>
-            <Text style={s.pageSubtitle}>{auth.currentUser?.email}</Text>
+            <Text style={s.pageSubtitle}>{auth.currentUser?.email ?? (auth.currentUser?.isAnonymous ? "Cont demo (anonim)" : "")}</Text>
           </View>
         </View>
 
